@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>换热站数字孪生 · 坐标拾取</title>
+  <style>
+    :root {
+      --bg:#eceff3; --panel:#ffffff; --panel-2:#f5f7fa; --line:#e3e8ee; --line-2:#d2dae2;
+      --txt:#1f2a33; --muted:#6a7785; --accent:#2b7cd3; --accent-d:#1f6cb6;
+      --accent-weak:rgba(43,124,211,.10); --shadow:0 1px 2px rgba(20,30,45,.06), 0 6px 18px rgba(20,30,45,.06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--txt);
+      font-family:-apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; overflow:hidden; }
+    #app { display:flex; flex-direction:column; height:100%; }
+    header { display:flex; align-items:center; gap:8px; padding:10px 16px;
+      background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap;
+      box-shadow:0 1px 3px rgba(20,30,45,.05); }
+    header h1 { font-size:15px; margin:0; font-weight:600; display:flex; align-items:center; }
+    header .logo { display:inline-block; width:14px; height:14px; border-radius:4px; margin-right:7px;
+      background:linear-gradient(135deg,#2b7cd3,#13a085); box-shadow:0 1px 3px rgba(43,124,211,.4); }
+    header .sub { color:var(--muted); font-size:12px; }
+    .btn { background:var(--panel-2); color:var(--txt); border:1px solid var(--line-2);
+      padding:6px 12px; border-radius:6px; cursor:pointer; font-size:13px; transition:all .15s; }
+    .btn:hover { border-color:var(--accent); background:#eef4fb; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+    .btn.primary:hover { background:var(--accent-d); border-color:var(--accent-d); }
+    .spacer { flex:1; }
+    #viewer { position:relative; flex:1; min-height:0; background:var(--bg); }
+    #drop-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      pointer-events:none; color:var(--muted); font-size:14px; opacity:0; transition:opacity .15s; }
+    #drop-hint.show { opacity:1; background:var(--accent-weak); outline:2px dashed var(--accent); outline-offset:-10px; }
+    #worldPins { position:absolute; inset:0; pointer-events:none; z-index:4; overflow:hidden; }
+    .wpin { position:absolute; transform:translate(-50%,-50%); pointer-events:none; will-change:left,top; }
+    .wpin .wdot { width:12px; height:12px; border-radius:50%; background:var(--c,#2b7cd3);
+      border:2px solid #fff; box-shadow:0 0 6px var(--c,#2b7cd3); }
+    .wpin .wlbl { position:absolute; left:14px; top:-5px; white-space:nowrap; background:var(--panel);
+      color:var(--txt); border:1px solid var(--c,#2b7cd3); padding:1px 6px; border-radius:4px; font-size:11px;
+      font-weight:600; box-shadow:var(--shadow); }
+    #devicePanels { position:absolute; inset:0; pointer-events:none; z-index:6; }
+    .devpanel { position:absolute; transform-origin:bottom center; transform:translate(-50%, -100%) scale(1);
+      min-width:90px; max-width:140px;
+      background:rgba(255,255,255,.97);
+      border:1px solid var(--line-2); border-top:2px solid var(--accent);
+      border-radius:8px; padding:5px 9px 6px;
+      box-shadow:0 2px 10px rgba(20,30,45,.14);
+      font-size:10px; line-height:1.35; backdrop-filter:blur(2px); }
+    .devpanel::after { content:''; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%);
+      border:6px solid transparent; border-top-color:var(--accent); }
+    .devpanel.below::after { bottom:auto; top:-6px; border-top-color:transparent; border-bottom-color:var(--accent); }
+    .devpanel .dp-head { display:flex; align-items:center; gap:5px; margin-bottom:3px; }
+    .devpanel .dp-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none;
+      box-shadow:0 0 4px var(--accent); }
+    .devpanel .dp-name { font-weight:700; font-size:10.5px; color:var(--txt); white-space:nowrap; letter-spacing:.2px; }
+    .devpanel .dp-rows { display:flex; flex-direction:column; gap:1px; }
+    .devpanel .dp-row { display:flex; justify-content:space-between; gap:12px; }
+    .devpanel .dp-row span { color:var(--muted); }
+    .devpanel .dp-row b { color:var(--txt); font-weight:600; font-variant-numeric:tabular-nums; }
+    .devmarker { position:absolute; width:12px; height:12px; border-radius:50%; background:var(--accent);
+      border:2px solid #fff; box-shadow:0 0 6px var(--accent); transform:translate(-50%,-50%); pointer-events:none; }
+    .devmarker b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:8px; color:#fff; font-weight:700; }
+    .devleader { position:absolute; height:2px; background:var(--accent); transform-origin:left center; opacity:.7; pointer-events:none; }
+    .devleader::after { content:''; position:absolute; right:-5px; top:-2px; width:0; height:0;
+      border:3px solid transparent; border-left:5px solid var(--accent); }
+    #legend { position:absolute; left:14px; top:14px; background:rgba(255,255,255,.94);
+      border:1px solid var(--line); border-radius:9px; padding:8px 10px; box-shadow:var(--shadow);
+      font-size:11px; z-index:15; display:flex; flex-direction:column; gap:4px; }
+    #legend .lg-title { font-size:11px; font-weight:700; color:var(--txt); margin-bottom:1px; }
+    #legend .lg-row { display:flex; align-items:center; gap:7px; color:var(--txt); }
+    #legend .lg-row i { width:9px; height:9px; border-radius:50%; flex:none; box-shadow:0 0 3px rgba(0,0,0,.2); }
+    #status { position:absolute; left:12px; bottom:12px; font-size:12px; color:var(--txt);
+      background:rgba(255,255,255,.92); padding:4px 10px; border-radius:6px; border:1px solid var(--line);
+      box-shadow:var(--shadow); }
+    #fps { position:absolute; right:14px; bottom:12px; font-size:12px; font-variant-numeric:tabular-nums;
+      color:var(--txt); background:rgba(255,255,255,.92); padding:4px 10px; border-radius:6px; border:1px solid var(--line);
+      box-shadow:var(--shadow); z-index:30; }
+    #roamHelp { position:absolute; left:50%; top:14px; transform:translateX(-50%); background:rgba(255,255,255,.94); border:1px solid var(--accent);
+      color:var(--txt); padding:6px 12px; border-radius:8px; font-size:12px; z-index:20; display:none; box-shadow:var(--shadow); }
+    #roamHelp.show { display:block; }
+    #pickPanel { position:absolute; right:14px; top:14px; width:252px; background:var(--panel);
+      border:1px solid var(--line); border-radius:10px; padding:12px; box-shadow:var(--shadow); z-index:20; font-size:13px; }
+    #pickPanel h3 { margin:0 0 8px; font-size:13px; color:var(--txt); }
+    #pickPanel .hint { color:var(--muted); font-size:12px; line-height:1.6; margin:0 0 8px; }
+    .pk-list { display:flex; flex-direction:column; gap:6px; max-height:46vh; overflow:auto; }
+    .pk-item { display:flex; align-items:center; gap:6px; background:var(--panel-2); border:1px solid var(--line);
+      border-radius:6px; padding:5px 7px; font-size:12px; }
+    .pk-item .seq { font-weight:600; color:var(--accent); flex:none; width:28px; }
+    .pk-item .xyz { flex:1; font-variant-numeric:tabular-nums; color:var(--txt); }
+    .pk-item .del { cursor:pointer; color:var(--muted); flex:none; }
+    .pk-item .del:hover { color:#e5484d; }
+    .pk-acts { display:flex; gap:6px; margin-top:8px; }
+    .pk-acts .btn { flex:1; padding:4px 8px; font-size:12px; }
+    .pk-empty { color:var(--muted); font-size:12px; padding:6px 0; }
+    /* 滚动条 */
+    .pk-list::-webkit-scrollbar { width:8px; }
+    .pk-list::-webkit-scrollbar-thumb { background:var(--line-2); border-radius:4px; }
+    .pk-list::-webkit-scrollbar-track { background:transparent; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1><span class="logo"></span>换热站数字孪生</h1>
+      <span class="sub">点击模型表面拾取坐标</span>
+      <div class="spacer"></div>
+      <input id="file" type="file" accept=".ply,.splat,.ksplat,.spz" hidden />
+      <button class="btn" id="loadBtn">选择模型</button>
+      <button class="btn primary" id="realBtn">已摆正</button>
+      <button class="btn" id="resetBtn">回到出生点</button>
+      <label class="chk" style="display:inline-flex;align-items:center;gap:5px;color:var(--txt);font-size:12px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="pickChk" style="margin:0;accent-color:var(--accent)" /> 选取坐标
+      </label>
+    </header>
+    <div id="viewer">
+      <div id="drop-hint">松开以加载高斯泼溅模型</div>
+      <div id="worldPins"></div>
+      <div id="devicePanels"></div>
+      <div id="legend">
+        <div class="lg-title">设备图例</div>
+        <div class="lg-row"><i style="background:#2b7cd3"></i>二级泵</div>
+        <div class="lg-row"><i style="background:#13a085"></i>循环泵</div>
+        <div class="lg-row"><i style="background:#e0821e"></i>补水泵</div>
+        <div class="lg-row"><i style="background:#9b59b6"></i>液位传感器</div>
+        <div class="lg-row"><i style="background:#e74c3c"></i>换热器</div>
+        <div class="lg-row"><i style="background:#00bcd4"></i>热表</div>
+      </div>
+      <div id="status">就绪</div>
+      <div id="fps">– FPS</div>
+      <div id="roamHelp">第一人称模式（碰撞已开启）：WASD 移动 · Q/E 升降 · 拖拽鼠标转向</div>
+      <div id="pickPanel">
+        <h3>拾取坐标</h3>
+        <p class="hint">开启「选取坐标」后，在模型表面单击即可记录该点的 X / Y / Z 世界坐标。</p>
+        <div class="pk-list" id="pkList"><div class="pk-empty">尚未拾取任何坐标</div></div>
+        <div class="pk-acts">
+          <button class="btn" id="copyPickBtn">复制全部</button>
+          <button class="btn" id="clearPickBtn">清空</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "./node_modules/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
