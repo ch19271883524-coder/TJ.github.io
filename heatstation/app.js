@@ -77,7 +77,8 @@ function updateWorldPins() {
 let _frames = 0, _fpsT = performance.now();
 function tick() {
   updateWorldPins();
-  if (roam && viewer && viewer.camera) roamMove();
+  if (tour) tourUpdate();
+  else if (roam && viewer && viewer.camera) roamMove();
   updateDevicePanels();
   _frames++;
   const _now = performance.now();
@@ -366,6 +367,125 @@ window.addEventListener('mousemove', e => {
 });
 window.addEventListener('keydown', e => { if (roam) keys[e.key.toLowerCase()] = true; });
 window.addEventListener('keyup', e => { if (roam) keys[e.key.toLowerCase()] = false; });
+
+// ---------- 自动导览（规定轨道巡游，按文案/旁白时间轴展示功能） ----------
+// 时间轴对齐「换热站推销配音_泽言_1.0x」字幕（11 段，总时长 67.5s）；每段对应一个镜头机位。
+const TOUR_SEGS = [
+  { t0: 0.000,  t1: 6.109,  cap: '在工业数字化转型的今天，换热站还靠人工巡检、凭经验判断吗？' },
+  { t0: 6.329,  t1: 13.069, cap: '我们基于三维高斯泼溅技术，将真实站房厘米级高保真还原于数字空间。' },
+  { t0: 13.289, t1: 16.238, cap: '以电脑版为例，三大核心能力：' },
+  { t0: 16.458, t1: 19.197, cap: '第一，沉浸式第一人称漫游。' },
+  { t0: 19.417, t1: 29.317, cap: 'W A S D 行走、Q E 升降，内置碰撞约束，沿设备表面平稳行进、杜绝穿模，拖拽即可身临其境环视全场。' },
+  { t0: 29.537, t1: 31.854, cap: '第二，实时数据可视化。' },
+  { t0: 32.074, t1: 41.132, cap: '六类设备以悬浮看板呈现、按类型着色；越近越清晰，移出视野自动收起，被遮挡仅留定位标识。' },
+  { t0: 41.352, t1: 43.458, cap: '第三，空间坐标拾取。' },
+  { t0: 43.678, t1: 48.313, cap: '点击模型表面即可记录世界坐标，便于资产标注。' },
+  { t0: 48.533, t1: 58.433, cap: '未来还将对接 S C A D A、P L C 实现实时告警，构建巡检工单一键派单，并支撑集团级多站点统一管控。' },
+  { t0: 58.653, t1: 67.500, cap: '从“可视”走向“可管、可控”——换热站数字孪生，让每一份热能、每一笔成本，清晰可溯。' },
+];
+// 每段镜头机位：pos=相机位置，look=注视点（世界坐标）。相邻段之间平滑插值飞行。
+const TOUR_KF = [
+  { pos: [2.2, 3.2, 7.5],   look: [6.0, 1.4, -3.0] },   // 0 开场全景（提问）
+  { pos: [0.5, 4.4, 9.0],   look: [6.2, 1.2, -3.0] },   // 1 整体 1:1 还原（俯瞰）
+  { pos: [3.6, 1.7, 3.8],   look: [6.6, 1.5, -2.5] },   // 2 推进过渡
+  { pos: [3.9, 1.05, 1.6],  look: [7.6, 1.6, -3.2] },   // 3 第一人称（贴地望向通道）
+  { pos: [8.9, 1.15, -5.2], look: [8.6, 1.5, -5.3] },   // 4 沿设备列滑行（漫游+碰撞）
+  { pos: [3.6, 1.25, 0.7],  look: [6.14, 1.29, 0.13] }, // 5 贴近二级泵（数据看板放大）
+  { pos: [4.6, 2.3, 2.6],   look: [7.0, 1.5, -3.0] },   // 6 多设备彩色看板总览
+  { pos: [4.0, 1.9, -2.6],  look: [6.30, 1.93, -4.10] },// 7 移到换热器前（准备拾取）
+  { pos: [4.0, 1.9, -2.6],  look: [6.30, 1.93, -4.10] },// 8 停留，逐点拾取坐标
+  { pos: [1.8, 4.4, 8.0],   look: [6.4, 1.2, -3.0] },   // 9 拉远（未来功能卡）
+  { pos: [0.6, 5.2, 10.5],  look: [6.4, 1.0, -3.0] },   // 10 收尾全景（项目卡）
+];
+const TOUR_START = { pos: [1.5, 3.6, 9.0], look: [6.0, 1.4, -3.0] }; // 第 0 段插值起点
+const TOUR_TOTAL = TOUR_SEGS[TOUR_SEGS.length - 1].t1;
+
+let tour = false, tourAudio = null, tourT0 = 0, tourSeg = -1, tourPicked = false;
+const _pp = new THREE.Vector3(), _tp = new THREE.Vector3();
+const _pl = new THREE.Vector3(), _tl = new THREE.Vector3();
+const tourUI = document.getElementById('tourUI');
+const tourCaption = document.getElementById('tourCaption');
+const tourProg = document.getElementById('tourProg');
+const futureCard = document.getElementById('futureCard');
+const endCard = document.getElementById('endCard');
+
+function easeInOut(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+function tourFindSeg(t) { for (let i = 0; i < TOUR_SEGS.length; i++) if (t < TOUR_SEGS[i].t1) return i; return TOUR_SEGS.length - 1; }
+
+function setCaption(t) { if (tourCaption) tourCaption.textContent = t; }
+function setTourProgress(p) { if (tourProg) tourProg.style.width = Math.max(0, Math.min(1, p)) * 100 + '%'; }
+function updateTourCards(i) {
+  if (futureCard) futureCard.style.display = (i === 9) ? '' : 'none';
+  if (endCard) endCard.style.display = (i >= 10) ? '' : 'none';
+}
+// 模拟“点击拾取坐标”：在第 8 段自动落 3 个点，演示一键拾取
+function doTourPicks() {
+  addPick([6.14, 1.29, 0.13]);
+  addPick([7.24, 1.75, -3.04]);
+  addPick([4.30, 2.85, 2.55]);
+}
+
+function tourUpdate() {
+  if (!viewer || !viewer.camera) return;
+  const t = tourAudio ? tourAudio.currentTime : (performance.now() - tourT0) / 1000;
+  if ((tourAudio && tourAudio.ended) || t >= TOUR_TOTAL) { finishTour(); return; }
+  const i = tourFindSeg(t);
+  const s = TOUR_SEGS[i];
+  const local = Math.min(1, Math.max(0, (t - s.t0) / (s.t1 - s.t0)));
+  const e = easeInOut(local);
+  const prev = (i === 0) ? TOUR_START : TOUR_KF[i - 1];
+  const cur = TOUR_KF[i];
+  _pp.set(prev.pos[0], prev.pos[1], prev.pos[2]).lerp(_tp.set(cur.pos[0], cur.pos[1], cur.pos[2]), e);
+  _pl.set(prev.look[0], prev.look[1], prev.look[2]).lerp(_tl.set(cur.look[0], cur.look[1], cur.look[2]), e);
+  const cam = viewer.camera;
+  cam.position.copy(_pp);
+  if (viewer.controls) viewer.controls.target.copy(_pl);
+  cam.lookAt(_pl);
+  if (i !== tourSeg) {
+    tourSeg = i; setCaption(s.cap); updateTourCards(i);
+    if (i === 8 && !tourPicked) { tourPicked = true; doTourPicks(); }
+  }
+  setTourProgress(t / TOUR_TOTAL);
+}
+
+function startTour() {
+  if (!viewer) { setStatus('请先加载模型'); return; }
+  // 清场，保证演示干净
+  worldPins.forEach(p => p.el.remove()); worldPins = []; picks = []; pinSeq = 1; renderPicks();
+  tour = true; tourSeg = -1; tourPicked = false; tourT0 = performance.now();
+  roam = false; pickMode = false; if (pickChk) pickChk.checked = false; viewerEl.style.cursor = '';
+  roamHelp.classList.remove('show');
+  if (tourUI) tourUI.classList.remove('hidden');
+  setCaption(TOUR_SEGS[0].cap); updateTourCards(0); setTourProgress(0);
+  // 尝试加载并同步播放旁白；文件缺失则退化为纯时间轴（无配音）
+  if (!tourAudio) {
+    tourAudio = new Audio('./tour-audio.mp3');
+    tourAudio.preload = 'auto';
+  }
+  tourAudio.currentTime = 0;
+  const p = tourAudio.play();
+  if (p && p.catch) p.catch(() => { setStatus('未检测到旁白音频，将以静音时间轴播放导览'); });
+  setStatus('自动导览中：镜头正沿轨道按文案展示功能…');
+}
+
+function finishTour() {
+  if (tour === false) return;   // 防止音频 ended 与 tick 重复触发
+  tour = false;
+  if (tourAudio) { try { tourAudio.pause(); } catch (e) {} }
+  if (tourUI) tourUI.classList.add('hidden');
+  updateTourCards(-1);
+  enterRoam();   // 回到第一人称，从导览结束的机位继续操作
+  setStatus('导览结束，已回到第一人称（碰撞已开启）');
+}
+
+document.getElementById('tourBtn').onclick = startTour;
+document.getElementById('tourReplay').onclick = () => {
+  worldPins.forEach(p => p.el.remove()); worldPins = []; picks = []; pinSeq = 1; renderPicks();
+  tourSeg = -1; tourPicked = false; tourT0 = performance.now();
+  if (tourAudio) { tourAudio.currentTime = 0; const pp = tourAudio.play(); if (pp && pp.catch) pp.catch(() => {}); }
+};
+document.getElementById('tourExit').onclick = finishTour;
+if (tourAudio) tourAudio.addEventListener('ended', () => { if (tour && tourAudio.currentTime >= TOUR_TOTAL - 0.05) finishTour(); });
 
 // ---------- 模型控制按钮 ----------
 fileInput.addEventListener('change', () => { const f = fileInput.files[0]; if (f) loadSplat(URL.createObjectURL(f), f.name); });
