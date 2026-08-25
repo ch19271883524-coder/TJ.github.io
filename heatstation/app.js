@@ -490,7 +490,7 @@ if (tourAudio) tourAudio.addEventListener('ended', () => { if (tour && tourAudio
 // ---------- 模型控制按钮 ----------
 fileInput.addEventListener('change', () => { const f = fileInput.files[0]; if (f) loadSplat(URL.createObjectURL(f), f.name); });
 document.getElementById('loadBtn').onclick = () => fileInput.click();
-document.getElementById('realBtn').onclick = () => loadSplat('./samples/xinminyuan.ply', '新民园 真实3DGS（已摆正）', { pos: SPAWN, look: SPAWN_LOOK }, { rotation: [1, 0, 0, 0], position: [0, 0.9295, 0] });
+document.getElementById('realBtn').onclick = () => loadSplat('https://huanrezhanshuzi-1474677827.cos.ap-beijing.myqcloud.com/xinminyuan.ply', '新民园 真实3DGS（已摆正）', { pos: SPAWN, look: SPAWN_LOOK }, { rotation: [1, 0, 0, 0], position: [0, 0.9295, 0] });
 document.getElementById('resetBtn').onclick = () => {
   if (!viewer || !viewer.camera || !lastCam) { setStatus('请先加载模型'); return; }
   viewer.camera.position.set(lastCam.pos[0], lastCam.pos[1], lastCam.pos[2]);
@@ -508,4 +508,4 @@ viewerEl.addEventListener('drop', e => {
 });
 
 // ---------- 启动默认加载（保留模型显示，出生点 #1） ----------
-loadSplat('./samples/xinminyuan.ply', '新民园 真实3DGS（137万点，已摆正）', { pos: SPAWN, look: SPAWN_LOOK }, { rotation: [1, 0, 0, 0], position: [0, 0.9295, 0] });
+loadSplat('https://huanrezhanshuzi-1474677827.cos.ap-beijing.myqcloud.com/xinminyuan.ply', '新民园 真实3DGS（137万点，已摆正）', { pos: SPAWN, look: SPAWN_LOOK }, { rotation: [1, 0, 0, 0], position: [0, 0.9295, 0] });
