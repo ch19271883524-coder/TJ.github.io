@@ -385,19 +385,19 @@ const TOUR_SEGS = [
 ];
 // 每段镜头机位：pos=相机位置，look=注视点（世界坐标）。相邻段之间平滑插值飞行。
 const TOUR_KF = [
-  { pos: [3.80, 1.55, 2.80], look: [6.50, 1.50, -2.50] },   // 0 开场即在站内（提问，眼前是设备）
-  { pos: [4.20, 1.65, 2.00], look: [6.80, 1.45, -2.80] },   // 1 站内缓移（1:1 还原，看细节）
-  { pos: [3.60, 1.70, 3.80], look: [6.60, 1.50, -2.50] },   // 2 推进过渡
+  { pos: [4.20, 1.60, 3.20], look: [6.80, 1.55, -2.50] },   // 0 开场即在站内（正对设备方向）
+  { pos: [4.60, 1.62, 2.20], look: [7.20, 1.60, -2.80] },   // 1 站内缓移（1:1 还原，看设备细节）
+  { pos: [5.00, 1.65, 1.20], look: [7.60, 1.65, -3.00] },   // 2 推进过渡
   { pos: [3.90, 1.05, 1.60], look: [7.60, 1.60, -3.20] },   // 3 第一人称（贴地望向通道）
-  { pos: [8.90, 1.15, -5.20], look: [8.60, 1.50, -5.30] },  // 4 沿设备列滑行（漫游+碰撞）
-  { pos: [3.60, 1.25, 0.70], look: [6.14, 1.29, 0.13] },    // 5 贴近二级泵（数据看板放大）
-  { pos: [4.60, 2.30, 2.60], look: [7.00, 1.50, -3.00] },   // 6 多设备彩色看板总览
-  { pos: [4.00, 1.90, -2.60], look: [6.30, 1.93, -4.10] },  // 7 移到换热器前（准备拾取）
-  { pos: [4.00, 1.90, -2.60], look: [6.30, 1.93, -4.10] },  // 8 停留，逐点拾取坐标
-  { pos: [1.80, 4.40, 8.00], look: [6.40, 1.20, -3.00] },   // 9 拉远（未来功能卡）
-  { pos: [0.60, 5.20, 10.50], look: [6.40, 1.00, -3.00] },  // 10 收尾全景（项目卡）
+  { pos: [8.80, 1.15, -5.00], look: [7.95, 1.40, -5.20] },  // 4 沿设备列滑行（漫游+碰撞）
+  { pos: [4.00, 1.28, 1.05], look: [6.14, 1.29, 0.13] },    // 5 贴近二级泵（数据看板放大）
+  { pos: [4.70, 2.05, 2.60], look: [7.00, 1.55, -3.00] },   // 6 多设备彩色看板总览（站内抬升）
+  { pos: [4.20, 1.60, -2.40], look: [6.30, 1.93, -4.10] },  // 7 移到换热器前（准备拾取）
+  { pos: [4.20, 1.60, -2.40], look: [6.30, 1.93, -4.10] },  // 8 停留，逐点拾取坐标
+  { pos: [3.60, 2.05, 3.00], look: [6.60, 1.50, -2.80] },   // 9 站内后拉（未来功能卡，不飞出模型）
+  { pos: [3.20, 2.25, 3.40], look: [6.60, 1.40, -2.80] },   // 10 收尾（仍站内，项目卡）
 ];
-const TOUR_START = { pos: [3.40, 1.50, 3.20], look: [6.50, 1.50, -2.50] }; // 第 0 段插值起点（站内）
+const TOUR_START = { pos: [4.00, 1.58, 3.60], look: [6.80, 1.55, -2.50] }; // 第 0 段插值起点（站内走廊）
 const TOUR_TOTAL = TOUR_SEGS[TOUR_SEGS.length - 1].t1;
 
 let tour = false, tourAudio = null, tourT0 = 0, tourSeg = -1, tourPicked = false;
@@ -438,6 +438,17 @@ function tourUpdate() {
   _pp.set(prev.pos[0], prev.pos[1], prev.pos[2]).lerp(_tp.set(cur.pos[0], cur.pos[1], cur.pos[2]), e);
   _pl.set(prev.look[0], prev.look[1], prev.look[2]).lerp(_tl.set(cur.look[0], cur.look[1], cur.look[2]), e);
   const cam = viewer.camera;
+  // 碰撞约束：沿「当前实际机位 → 目标」方向做 3DGS 射线检测，命中表面则夹紧步长，避免穿模
+  if (viewer.splatMesh) {
+    const delta = _pp.clone().sub(cam.position);
+    const len = delta.length();
+    if (len > 1e-3) {
+      const dir = delta.clone().normalize();
+      const d = castSplatDist(cam.position, dir);
+      const allowed = d - COLLISION_RADIUS;
+      if (allowed < len) _pp.copy(cam.position).addScaledVector(dir, Math.max(0.05, allowed));
+    }
+  }
   cam.position.copy(_pp);
   if (viewer.controls) viewer.controls.target.copy(_pl);
   cam.lookAt(_pl);

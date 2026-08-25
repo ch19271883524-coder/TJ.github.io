@@ -107,6 +107,9 @@
       background:rgba(255,255,255,.96); border:1px solid var(--accent); border-radius:14px; padding:18px 28px;
       box-shadow:0 8px 30px rgba(20,30,45,.18); text-align:center; pointer-events:none; }
     #futureCard.hidden, #endCard.hidden { display:none; }
+    /* 卡片出现时淡入，避免与镜头切换同时突兀弹出 */
+    #futureCard:not(.hidden), #endCard:not(.hidden) { animation: cardFade .5s ease both; }
+    @keyframes cardFade { from { opacity:0; } to { opacity:1; } }
     #futureCard .fc-title, #endCard .ec-title { font-size:18px; font-weight:700; color:var(--txt); margin-bottom:12px; }
     #futureCard .fc-list { display:flex; flex-direction:column; gap:8px; }
     #futureCard .fc-list span { font-size:13px; color:var(--accent-d); background:var(--accent-weak);
