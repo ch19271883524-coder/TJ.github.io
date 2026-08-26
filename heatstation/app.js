@@ -45,7 +45,7 @@ async function loadSplat(url, label, cam, xf) {
     window.__viewer = viewer; // 调试/自动验证用：暴露 viewer 实例
     await viewer.addSplatScene(url, { splatAlphaRemovalThreshold: 1, showLoadingUI: true, position: transform.position, rotation: transform.rotation, scale: [1, 1, 1], progressiveLoad: false });
     viewer.start(); currentSceneURL = url;
-    try { if (viewer.renderer) viewer.renderer.setClearColor(0xeceff3, 1); if (viewer.scene) viewer.scene.background = new THREE.Color(0xeceff3); } catch (e) {}
+    try { if (viewer.renderer) viewer.renderer.setClearColor(0xeef1f6, 1); if (viewer.scene) viewer.scene.background = new THREE.Color(0xeef1f6); } catch (e) {}
     enterRoam();   // 加载完成即进入第一人称模式（唯一交互模式）
     setStatus('已加载' + (label ? '：' + label : ''));
   } catch (e) { console.error(e); setStatus('加载失败：' + (e && e.message ? e.message : e)); }
@@ -110,7 +110,7 @@ viewerEl.addEventListener('pointerup', e => {
 function addPick(p) {
   const x = +p[0].toFixed(3), y = +p[1].toFixed(3), z = +p[2].toFixed(3);
   const id = pinSeq++;
-  const el = document.createElement('div'); el.className = 'wpin'; el.dataset.pid = id; el.style.setProperty('--c', '#2b7cd3');
+  const el = document.createElement('div'); el.className = 'wpin'; el.dataset.pid = id; el.style.setProperty('--c', '#2f6fed');
   el.innerHTML = `<div class="wdot"></div><div class="wlbl">#${id} (${x}, ${y}, ${z})</div>`;
   worldPinsEl.appendChild(el);
   worldPins.push({ el, point: new THREE.Vector3(x, y, z) });
