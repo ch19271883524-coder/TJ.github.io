@@ -176,6 +176,48 @@
     .pk-list::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
     .pk-list::-webkit-scrollbar-thumb:hover { background: #c2ccd8; }
     .pk-list::-webkit-scrollbar-track { background: transparent; }
+
+    /* ===== 移动端适配 (≤768px)：仅针对浮层与头部做收敛，桌面端不变 ===== */
+    @media (max-width: 768px) {
+      html, body { font-size: 13px; }
+      header { padding: 9px 12px; gap: 7px; }
+      header h1 { font-size: 13.5px; }
+      header .sub { display: none; }                 /* 省头部空间 */
+      .btn { padding: 8px 13px; font-size: 13px; }   /* 触控目标略大 */
+      .btn.sm { padding: 7px 10px; }
+      /* 非核心按钮在窄屏折叠，避免头部拥挤；核心「自动导览」保留 */
+      #loadBtn, #realBtn, #resetBtn { display: none; }
+      /* 图例紧凑化 */
+      #legend { left: 10px; top: 10px; padding: 7px 9px; font-size: 11px; gap: 4px; border-radius: 10px; }
+      #legend .lg-title { font-size: 11px; }
+      /* 拾取面板：小屏改为顶部抽屉（左右贴边、不占满中央 3D） */
+      #pickPanel { right: 10px; left: 10px; top: 10px; width: auto; max-width: none;
+        padding: 11px; font-size: 12px; max-height: 44vh; }
+      .pk-list { max-height: 30vh; }
+      /* 状态 / FPS 缩小并内移，避免与底部导览条重叠 */
+      #status, #fps { font-size: 11px; padding: 4px 9px; bottom: 10px; }
+      #status { left: 10px; }
+      #fps { right: 10px; }
+      /* 导览条：加 iOS 安全区，字幕缩小 */
+      #tourUI { bottom: calc(46px + env(safe-area-inset-bottom, 0px)); width: 94%; }
+      #tourCaption { font-size: 12.5px; }
+      #tourBar { padding: 9px 11px; gap: 8px; }
+      /* 总结 / 未来卡片 */
+      #futureCard, #endCard { width: min(360px, 88%); padding: 16px 18px; top: 44%; }
+      #futureCard .fc-title, #endCard .ec-title { font-size: 16px; }
+      /* 设备面板紧凑，避免小屏堆叠压迫 */
+      .devpanel { font-size: 10px; min-width: 78px; max-width: 118px; padding: 5px 8px 6px; }
+      .devpanel .dp-name { font-size: 10.5px; }
+      .devpanel .dp-row { font-size: 9.5px; gap: 8px; }
+      .wpin .wlbl { font-size: 10px; padding: 1px 5px; left: 12px; }
+    }
+    @media (max-width: 420px) {
+      header h1 { font-size: 12.5px; }
+      #legend { font-size: 10px; padding: 5px 7px; gap: 3px; }
+      #pickPanel { padding: 9px; }
+      #tourUI { bottom: calc(42px + env(safe-area-inset-bottom, 0px)); }
+      #futureCard, #endCard { padding: 14px 15px; }
+    }
   </style>
 </head>
 <body>
