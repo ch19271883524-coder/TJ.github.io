@@ -388,22 +388,23 @@ const TOUR_SEGS = [
   { t0: 58.653, t1: 67.500, cap: '从“可视”走向“可管、可控”——换热站数字孪生，让每一份热能、每一笔成本，清晰可溯。' },
 ];
 // 每段镜头机位：pos=相机位置，look=注视点（世界坐标）。相邻段之间平滑插值飞行。
-// 设计原则：机位严格位于入口走廊开放区（x≈4.0~5.2，z≈0.6~2.2），保持与右侧墙面、
-// 左侧设备的安全距离，不深入设备密集区；y 维持走廊地面高度，避免天花板空白。
+// 设计原则：所有机位均经“对真实扫描模型做 8 向射线探针”验证——位于房间内部、与表面
+// 净距≥1.0m（free）、且注视方向命中真实几何体（不空洞）。机位沿“出生点→设备簇”走廊分布，
+// 注视点全部指向已验证落在模型表面的设备坐标。y 在 0.66~1.10 之间（避开横管/贴地设备）。
 const TOUR_KF = [
-  { pos: [4.30, 1.55, 2.00], look: [6.80, 1.55, 0.00] },    // 0 开场：走廊地面，已能看到设备
-  { pos: [4.60, 1.55, 1.80], look: [7.00, 1.55, -0.50] },   // 1 缓移：看整体 1:1 还原
-  { pos: [4.90, 1.58, 1.60], look: [7.20, 1.55, -1.00] },   // 2 推进：继续沿走廊深入
-  { pos: [5.10, 1.60, 1.40], look: [7.30, 1.55, -1.50] },   // 3 第一人称：望向通道深处
-  { pos: [5.20, 1.60, 1.20], look: [7.30, 1.55, -2.00] },   // 4 沿设备列滑行：看设备侧面
-  { pos: [5.20, 1.60, 1.00], look: [7.00, 1.55, -2.50] },   // 5 看循环泵：走廊远处正视
-  { pos: [5.10, 1.60, 0.80], look: [6.80, 1.60, -3.00] },   // 6 多设备彩色看板总览
-  { pos: [5.00, 1.65, 0.60], look: [6.50, 1.70, -3.50] },   // 7 换热器前：走廊末端正视
-  { pos: [5.00, 1.65, 0.60], look: [6.50, 1.70, -3.50] },   // 8 停留，逐点拾取坐标
-  { pos: [4.60, 1.70, 1.00], look: [6.00, 1.60, -2.50] },   // 9 后拉：未来功能卡（仍站内）
-  { pos: [4.00, 1.80, 1.20], look: [5.50, 1.60, -2.00] },   // 10 收尾：项目卡（仍站内）
+  { pos: [2.06, 1.00, 0.00], look: [6.138, 1.289, 0.132] },    // 0 二级泵#1
+  { pos: [2.52, 1.05, -0.28], look: [6.153, 1.33, 1.339] },   // 1 二级泵#2
+  { pos: [2.80, 1.05, -0.45], look: [7.236, 1.755, -3.036] }, // 2 循环泵#1
+  { pos: [3.10, 1.10, -0.63], look: [8.282, 1.956, -2.901] }, // 3 循环泵#2
+  { pos: [3.50, 1.10, -0.83], look: [6.299, 1.934, -4.098] }, // 4 换热器
+  { pos: [4.15, 1.00, -1.25], look: [7.88, 1.341, -4.914] },  // 5 补水泵#1
+  { pos: [4.27, 0.66, -1.32], look: [7.917, 1.353, -5.273] }, // 6 补水泵#2（低姿避开横管）
+  { pos: [4.70, 1.00, -1.60], look: [3.828, 2.385, -7.533] }, // 7 液位传感器
+  { pos: [4.90, 1.05, -1.70], look: [4.555, 2.91, 2.616] },   // 8 热表（仰视）
+  { pos: [5.20, 1.00, -1.85], look: [6.299, 1.934, -4.098] }, // 9 换热器总览（未来卡）
+  { pos: [5.55, 1.00, -2.05], look: [6.20, 1.60, -3.00] },    // 10 收尾（项目卡）
 ];
-const TOUR_START = { pos: [4.00, 1.55, 2.20], look: [6.50, 1.55, 0.50] }; // 起点：入口走廊中心，远离右墙和设备
+const TOUR_START = { pos: [1.83, 1.00, 0.14], look: [6.138, 1.289, 0.132] }; // 起点：出生点附近（已验证模型内、可见设备）
 const TOUR_RADIUS = 1.0;  // 导览安全半径（比第一人称更保守，避免 3DGS 射线抖动）
 const _tourDirs = [];
 for (let i = 0; i < 8; i++) {
@@ -453,10 +454,10 @@ function updateTourCards(i) {
 }
 // 模拟“点击拾取坐标”：在第 8 段自动落 3 个点，演示一键拾取
 function doTourPicks() {
-  // 拾取点沿第 8 段机位视线分布，确保落在视野内
-  addPick([5.5, 1.6, -1.0]);
-  addPick([6.0, 1.7, -2.0]);
-  addPick([6.5, 1.8, -3.5]);
+  // 拾取点指向已验证“落在模型表面”的设备坐标，确保世界坐标针脚吸附在真实设备上
+  addPick([6.138, 1.289, 0.132]);   // 二级泵#1
+  addPick([7.236, 1.755, -3.036]);  // 循环泵#1
+  addPick([6.299, 1.934, -4.098]);  // 换热器
 }
 
 function tourUpdate() {
@@ -496,12 +497,16 @@ function tourUpdate() {
 function startTour() {
   if (!viewer) { setStatus('请先加载模型'); return; }
   if (!viewer.splatMesh) { setStatus('模型加载中，请稍候再试'); return; }
-  // 关闭 Viewer 内置 OrbitControls 阻尼/角度限制，避免与 tourUpdate 每帧设定的机位互相拉扯
+  // 关闭 Viewer 内置 OrbitControls 阻尼/角度限制；并【彻底接管相机】：把 controls.update
+  // 替换为空操作，阻止 Viewer 渲染循环每帧回写 camera.lookAt(target) 与相机位置，
+  // 从根上消除“镜头被 OrbitControls 拉回旧 target”导致的快速抽动。finishTour 时还原。
   if (viewer.controls) {
     viewer.controls.enabled = false;
     viewer.controls.enableDamping = false;
     viewer.controls.minPolarAngle = 0;
     viewer.controls.maxPolarAngle = Math.PI;
+    if (!viewer.__origControlsUpdate) viewer.__origControlsUpdate = viewer.controls.update.bind(viewer.controls);
+    viewer.controls.update = function () {};
   }
   // 清场，保证演示干净
   worldPins.forEach(p => p.el.remove()); worldPins = []; picks = []; pinSeq = 1; renderPicks();
@@ -525,6 +530,11 @@ function startTour() {
 function finishTour() {
   if (tour === false) return;   // 防止音频 ended 与 tick 重复触发
   tour = false;
+  // 还原 OrbitControls.update（导览期间被替换为空操作）
+  if (viewer && viewer.controls && viewer.__origControlsUpdate) {
+    viewer.controls.update = viewer.__origControlsUpdate;
+    viewer.__origControlsUpdate = null;
+  }
   if (tourAudio) { try { tourAudio.pause(); } catch (e) {} }
   if (tourUI) tourUI.classList.add('hidden');
   if (pickPanel) pickPanel.classList.remove('hidden'); // 导览结束恢复拾取面板
@@ -537,7 +547,18 @@ document.getElementById('tourBtn').onclick = startTour;
 document.getElementById('tourReplay').onclick = () => {
   worldPins.forEach(p => p.el.remove()); worldPins = []; picks = []; pinSeq = 1; renderPicks();
   tourSeg = -1; tourPicked = false; tourT0 = performance.now();
+  tour = true; roam = false; pickMode = false; if (pickChk) pickChk.checked = false; viewerEl.style.cursor = '';
+  // 重新接管相机（与 startTour 一致）
+  if (viewer && viewer.controls) {
+    if (!viewer.__origControlsUpdate) viewer.__origControlsUpdate = viewer.controls.update.bind(viewer.controls);
+    viewer.controls.update = function () {};
+    viewer.controls.enabled = false;
+  }
+  if (tourUI) tourUI.classList.remove('hidden');
+  if (pickPanel) pickPanel.classList.add('hidden');
+  setCaption(TOUR_SEGS[0].cap); updateTourCards(0); setTourProgress(0);
   if (tourAudio) { tourAudio.currentTime = 0; const pp = tourAudio.play(); if (pp && pp.catch) pp.catch(() => {}); }
+  setStatus('重新播放导览…');
 };
 document.getElementById('tourExit').onclick = finishTour;
 if (tourAudio) tourAudio.addEventListener('ended', () => { if (tour && tourAudio.currentTime >= TOUR_TOTAL - 0.05) finishTour(); });
