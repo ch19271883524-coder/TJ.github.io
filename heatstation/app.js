@@ -385,39 +385,47 @@ const TOUR_SEGS = [
   { t0: 58.653, t1: 67.500, cap: '从“可视”走向“可管、可控”——换热站数字孪生，让每一份热能、每一笔成本，清晰可溯。' },
 ];
 // 每段镜头机位：pos=相机位置，look=注视点（世界坐标）。相邻段之间平滑插值飞行。
-// 设计原则：机位位于走廊地面高度（y≈1.5~1.6），z 从站房后方走廊单调推进到换热器区域，
-// 避免前后跳变；开场即落在有 splat 数据的走廊位置，杜绝“天花板空白/花屏”问题。
+// 设计原则：机位严格位于入口走廊开放区（x≈4.0~5.2，z≈0.6~2.2），保持与右侧墙面、
+// 左侧设备的安全距离，不深入设备密集区；y 维持走廊地面高度，避免天花板空白。
 const TOUR_KF = [
-  { pos: [5.50, 1.55, 3.50], look: [7.00, 1.55, 1.00] },    // 0 开场：走廊地面，已能看到设备
-  { pos: [6.50, 1.58, 2.80], look: [7.50, 1.55, 0.50] },    // 1 缓移：看整体 1:1 还原
-  { pos: [7.20, 1.60, 2.10], look: [8.00, 1.55, 0.00] },    // 2 推进：继续沿走廊深入
-  { pos: [7.80, 1.60, 1.40], look: [8.30, 1.55, -1.00] },   // 3 第一人称：望向通道深处
-  { pos: [8.20, 1.60, 0.60], look: [8.50, 1.55, -2.00] },   // 4 沿设备列滑行：看设备侧面
-  { pos: [7.80, 1.60, -0.40], look: [8.00, 1.55, -1.50] },  // 5 看循环泵：走廊远处正视
-  { pos: [6.80, 1.60, -1.60], look: [7.20, 1.60, -2.50] },  // 6 多设备彩色看板总览
-  { pos: [6.00, 1.60, -2.80], look: [6.30, 1.93, -4.10] },  // 7 换热器前：走廊末端正视
-  { pos: [6.00, 1.60, -2.80], look: [6.30, 1.93, -4.10] },  // 8 停留，逐点拾取坐标
-  { pos: [4.80, 1.80, -1.50], look: [6.50, 1.60, -3.00] },  // 9 后拉：未来功能卡（仍站内）
-  { pos: [3.80, 2.00, -0.50], look: [6.50, 1.50, -2.50] },  // 10 收尾：项目卡（仍站内）
+  { pos: [4.30, 1.55, 2.00], look: [6.80, 1.55, 0.00] },    // 0 开场：走廊地面，已能看到设备
+  { pos: [4.60, 1.55, 1.80], look: [7.00, 1.55, -0.50] },   // 1 缓移：看整体 1:1 还原
+  { pos: [4.90, 1.58, 1.60], look: [7.20, 1.55, -1.00] },   // 2 推进：继续沿走廊深入
+  { pos: [5.10, 1.60, 1.40], look: [7.30, 1.55, -1.50] },   // 3 第一人称：望向通道深处
+  { pos: [5.20, 1.60, 1.20], look: [7.30, 1.55, -2.00] },   // 4 沿设备列滑行：看设备侧面
+  { pos: [5.20, 1.60, 1.00], look: [7.00, 1.55, -2.50] },   // 5 看循环泵：走廊远处正视
+  { pos: [5.10, 1.60, 0.80], look: [6.80, 1.60, -3.00] },   // 6 多设备彩色看板总览
+  { pos: [5.00, 1.65, 0.60], look: [6.50, 1.70, -3.50] },   // 7 换热器前：走廊末端正视
+  { pos: [5.00, 1.65, 0.60], look: [6.50, 1.70, -3.50] },   // 8 停留，逐点拾取坐标
+  { pos: [4.60, 1.70, 1.00], look: [6.00, 1.60, -2.50] },   // 9 后拉：未来功能卡（仍站内）
+  { pos: [4.00, 1.80, 1.20], look: [5.50, 1.60, -2.00] },   // 10 收尾：项目卡（仍站内）
 ];
-const TOUR_START = { pos: [4.50, 1.55, 3.80], look: [7.00, 1.55, 1.00] }; // 起点：走廊地面，确保开场即有模型
+const TOUR_START = { pos: [4.00, 1.55, 2.20], look: [6.50, 1.55, 0.50] }; // 起点：入口走廊中心，远离右墙和设备
 const TOUR_RADIUS = 1.0;  // 导览安全半径（比第一人称更保守，避免 3DGS 射线抖动）
-const _tourDirs = [
-  new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
-  new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
-];
-// 把 pos 推出几何体内部/过近表面：只测水平 4 方向（避免上下震荡），只推一次（避免迭代震荡）
+const _tourDirs = [];
+for (let i = 0; i < 8; i++) {
+  const a = (i / 8) * Math.PI * 2;
+  _tourDirs.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+}
+// 把 pos 推出几何体内部/过近表面：水平 8 方向采样，用叠加斥力把相机推回开放空间；
+// 相比单方向硬推，斥力场在角落/多面同时靠近时更稳定，不易来回震荡。
 function clampTourPosition(pos) {
   if (!viewer || !viewer.splatMesh) return pos;
-  let worstDir = null, worstPen = 0;
-  for (const d of _tourDirs) {
-    const dist = castSplatDist(pos, d);
-    if (dist < TOUR_RADIUS) {
-      const pen = TOUR_RADIUS - dist;
-      if (pen > worstPen) { worstPen = pen; worstDir = d; }
+  for (let iter = 0; iter < 3; iter++) {
+    let dx = 0, dz = 0, active = false;
+    for (const d of _tourDirs) {
+      const dist = castSplatDist(pos, d);
+      if (dist < TOUR_RADIUS) {
+        const pen = TOUR_RADIUS - dist;
+        dx -= d.x * pen;
+        dz -= d.z * pen;
+        active = true;
+      }
     }
+    if (!active) break;
+    pos.x += dx;
+    pos.z += dz;
   }
-  if (worstDir && worstPen > 1e-4) pos.addScaledVector(worstDir, -worstPen);
   return pos;
 }
 const TOUR_TOTAL = TOUR_SEGS[TOUR_SEGS.length - 1].t1;
@@ -442,9 +450,10 @@ function updateTourCards(i) {
 }
 // 模拟“点击拾取坐标”：在第 8 段自动落 3 个点，演示一键拾取
 function doTourPicks() {
-  addPick([6.14, 1.29, 0.13]);
-  addPick([7.24, 1.75, -3.04]);
-  addPick([4.30, 2.85, 2.55]);
+  // 拾取点沿第 8 段机位视线分布，确保落在视野内
+  addPick([5.5, 1.6, -1.0]);
+  addPick([6.0, 1.7, -2.0]);
+  addPick([6.5, 1.8, -3.5]);
 }
 
 function tourUpdate() {
@@ -478,6 +487,13 @@ function tourUpdate() {
 function startTour() {
   if (!viewer) { setStatus('请先加载模型'); return; }
   if (!viewer.splatMesh) { setStatus('模型加载中，请稍候再试'); return; }
+  // 关闭 Viewer 内置 OrbitControls 阻尼/角度限制，避免与 tourUpdate 每帧设定的机位互相拉扯
+  if (viewer.controls) {
+    viewer.controls.enabled = false;
+    viewer.controls.enableDamping = false;
+    viewer.controls.minPolarAngle = 0;
+    viewer.controls.maxPolarAngle = Math.PI;
+  }
   // 清场，保证演示干净
   worldPins.forEach(p => p.el.remove()); worldPins = []; picks = []; pinSeq = 1; renderPicks();
   tour = true; tourSeg = -1; tourPicked = false; tourT0 = performance.now();
