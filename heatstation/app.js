@@ -9,6 +9,7 @@ const pkList = document.getElementById('pkList');
 const dropHint = document.getElementById('drop-hint');
 const fpsEl = document.getElementById('fps');
 const devicePanelsEl = document.getElementById('devicePanels');
+const pickPanel = document.getElementById('pickPanel');
 
 let viewer = null;
 let currentSceneURL = null;
@@ -384,20 +385,45 @@ const TOUR_SEGS = [
   { t0: 58.653, t1: 67.500, cap: '从“可视”走向“可管、可控”——换热站数字孪生，让每一份热能、每一笔成本，清晰可溯。' },
 ];
 // 每段镜头机位：pos=相机位置，look=注视点（世界坐标）。相邻段之间平滑插值飞行。
+// 设计原则：机位全部位于站房走廊/通道上方（y>=1.7），远离管道密集区，避免穿模；
+// 贴近设备的镜头通过“走廊远眺”实现，而非扎入设备内部。
 const TOUR_KF = [
-  { pos: [4.20, 1.60, 3.20], look: [6.80, 1.55, -2.50] },   // 0 开场即在站内（正对设备方向）
-  { pos: [4.60, 1.62, 2.20], look: [7.20, 1.60, -2.80] },   // 1 站内缓移（1:1 还原，看设备细节）
-  { pos: [5.00, 1.65, 1.20], look: [7.60, 1.65, -3.00] },   // 2 推进过渡
-  { pos: [3.90, 1.05, 1.60], look: [7.60, 1.60, -3.20] },   // 3 第一人称（贴地望向通道）
-  { pos: [8.80, 1.15, -5.00], look: [7.95, 1.40, -5.20] },  // 4 沿设备列滑行（漫游+碰撞）
-  { pos: [4.00, 1.28, 1.05], look: [6.14, 1.29, 0.13] },    // 5 贴近二级泵（数据看板放大）
-  { pos: [4.70, 2.05, 2.60], look: [7.00, 1.55, -3.00] },   // 6 多设备彩色看板总览（站内抬升）
-  { pos: [4.20, 1.60, -2.40], look: [6.30, 1.93, -4.10] },  // 7 移到换热器前（准备拾取）
-  { pos: [4.20, 1.60, -2.40], look: [6.30, 1.93, -4.10] },  // 8 停留，逐点拾取坐标
-  { pos: [3.60, 2.05, 3.00], look: [6.60, 1.50, -2.80] },   // 9 站内后拉（未来功能卡，不飞出模型）
-  { pos: [3.20, 2.25, 3.40], look: [6.60, 1.40, -2.80] },   // 10 收尾（仍站内，项目卡）
+  { pos: [4.60, 2.40, 2.60], look: [7.00, 1.60, -2.50] },   // 0 开场：走廊高处，正对设备区
+  { pos: [5.40, 2.40, 1.90], look: [7.50, 1.60, -3.00] },   // 1 缓移：看整体 1:1 还原
+  { pos: [6.20, 2.30, 1.30], look: [8.00, 1.60, -3.50] },   // 2 推进：继续沿走廊深入
+  { pos: [6.80, 1.70, 0.80], look: [8.20, 1.60, -4.00] },   // 3 第一人称：贴走廊地面，望向通道深处
+  { pos: [8.00, 1.80, -1.50], look: [8.50, 1.60, -4.50] },  // 4 沿设备列滑行：保持在通道，看设备侧面
+  { pos: [6.80, 2.00, 0.00],  look: [6.14, 1.29, 0.13] },   // 5 看循环泵：走廊处远眺，不贴近管道
+  { pos: [5.80, 2.50, 1.50], look: [7.00, 1.50, -2.00] },   // 6 抬升：多设备彩色看板总览
+  { pos: [5.80, 2.10, -2.00], look: [6.30, 1.93, -4.10] },  // 7 换热器前：通道处正视
+  { pos: [5.80, 2.10, -2.00], look: [6.30, 1.93, -4.10] },  // 8 停留，逐点拾取坐标
+  { pos: [4.80, 2.50, 2.20], look: [6.50, 1.50, -2.50] },   // 9 后拉：未来功能卡（仍站内）
+  { pos: [4.20, 2.60, 2.80], look: [6.50, 1.40, -2.50] },   // 10 收尾：项目卡（仍站内）
 ];
-const TOUR_START = { pos: [4.00, 1.58, 3.60], look: [6.80, 1.55, -2.50] }; // 第 0 段插值起点（站内走廊）
+const TOUR_START = { pos: [4.00, 2.40, 3.30], look: [6.80, 1.60, -2.50] }; // 起点：站房入口走廊上方
+const TOUR_RADIUS = 0.8;  // 导览安全半径（比第一人称更保守）
+const _tourDirs = [
+  new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
+  new THREE.Vector3(0,1,0), new THREE.Vector3(0,-1,0),
+  new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
+];
+// 把 pos 推出几何体内部/过近表面：朝 6 轴打短射线，发现表面侵入安全半径则反向推出
+function clampTourPosition(pos) {
+  if (!viewer || !viewer.splatMesh) return pos;
+  for (let iter = 0; iter < 8; iter++) {
+    let worstDir = null, worstPen = 0;
+    for (const d of _tourDirs) {
+      const dist = castSplatDist(pos, d);
+      if (dist < TOUR_RADIUS) {
+        const pen = TOUR_RADIUS - dist;
+        if (pen > worstPen) { worstPen = pen; worstDir = d; }
+      }
+    }
+    if (!worstDir || worstPen < 1e-4) break;
+    pos.addScaledVector(worstDir, -worstPen);
+  }
+  return pos;
+}
 const TOUR_TOTAL = TOUR_SEGS[TOUR_SEGS.length - 1].t1;
 
 let tour = false, tourAudio = null, tourT0 = 0, tourSeg = -1, tourPicked = false;
@@ -438,18 +464,29 @@ function tourUpdate() {
   _pp.set(prev.pos[0], prev.pos[1], prev.pos[2]).lerp(_tp.set(cur.pos[0], cur.pos[1], cur.pos[2]), e);
   _pl.set(prev.look[0], prev.look[1], prev.look[2]).lerp(_tl.set(cur.look[0], cur.look[1], cur.look[2]), e);
   const cam = viewer.camera;
-  // 碰撞约束：沿「当前实际机位 → 目标」方向做 3DGS 射线检测，命中表面则夹紧步长，避免穿模
-  if (viewer.splatMesh) {
-    const delta = _pp.clone().sub(cam.position);
-    const len = delta.length();
-    if (len > 1e-3) {
-      const dir = delta.clone().normalize();
-      const d = castSplatDist(cam.position, dir);
-      const allowed = d - COLLISION_RADIUS;
-      if (allowed < len) _pp.copy(cam.position).addScaledVector(dir, Math.max(0.05, allowed));
+
+  // 1) 保证目标点不在几何体内部/不贴设备过近
+  clampTourPosition(_pp);
+
+  // 2) 从当前位置朝目标点移动；前方碰撞则夹紧，但保留最小滑行步长，避免彻底卡死
+  const desired = _pp.clone();
+  const delta = desired.sub(cam.position);
+  const len = delta.length();
+  if (len > 1e-4 && viewer.splatMesh) {
+    const dir = delta.clone().normalize();
+    const d = castSplatDist(cam.position, dir);
+    if (d < len + TOUR_RADIUS) {
+      const maxStep = Math.max(0.10, d - TOUR_RADIUS); // 最小 10cm/帧，防止被夹死
+      cam.position.addScaledVector(dir, Math.min(len, maxStep));
+    } else {
+      cam.position.copy(_pp);
     }
+    // 移动后再清理一次当前相机位置，防止推进后进入内部
+    clampTourPosition(cam.position);
+  } else {
+    cam.position.copy(_pp);
   }
-  cam.position.copy(_pp);
+
   if (viewer.controls) viewer.controls.target.copy(_pl);
   cam.lookAt(_pl);
   if (i !== tourSeg) {
@@ -466,6 +503,7 @@ function startTour() {
   tour = true; tourSeg = -1; tourPicked = false; tourT0 = performance.now();
   roam = false; pickMode = false; if (pickChk) pickChk.checked = false; viewerEl.style.cursor = '';
   roamHelp.classList.remove('show');
+  if (pickPanel) pickPanel.classList.add('hidden'); // 导览时收起拾取面板，避免遮挡画面
   if (tourUI) tourUI.classList.remove('hidden');
   setCaption(TOUR_SEGS[0].cap); updateTourCards(0); setTourProgress(0);
   // 尝试加载并同步播放旁白；文件缺失则退化为纯时间轴（无配音）
@@ -484,6 +522,7 @@ function finishTour() {
   tour = false;
   if (tourAudio) { try { tourAudio.pause(); } catch (e) {} }
   if (tourUI) tourUI.classList.add('hidden');
+  if (pickPanel) pickPanel.classList.remove('hidden'); // 导览结束恢复拾取面板
   updateTourCards(-1);
   enterRoam();   // 回到第一人称，从导览结束的机位继续操作
   setStatus('导览结束，已回到第一人称（碰撞已开启）');
