@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import * as GaussianSplats3D from './node_modules/@mkkellogg/gaussian-splats-3d/build/gaussian-splats-3d.module.js';
 
+window.__three = THREE;
+
 const viewerEl = document.getElementById('viewer');
 const statusEl = document.getElementById('status');
 const fileInput = document.getElementById('file');
@@ -40,6 +42,7 @@ async function loadSplat(url, label, cam, xf) {
   const transform = xf || { rotation: [0, 0, 0, 1], position: [0, 0, 0] };
   try {
     viewer = new GaussianSplats3D.Viewer({ rootElement: viewerEl, cameraUp: camUp, initialCameraPosition: camPos, initialCameraLookAt: camLook, selfDrivenMode: true, gpuAcceleratedSort: false, sharedMemoryForWorkers: false, devicePixelRatio: RENDER_DPR, antialiased: true });
+    window.__viewer = viewer; // 调试/自动验证用：暴露 viewer 实例
     await viewer.addSplatScene(url, { splatAlphaRemovalThreshold: 1, showLoadingUI: true, position: transform.position, rotation: transform.rotation, scale: [1, 1, 1], progressiveLoad: false });
     viewer.start(); currentSceneURL = url;
     try { if (viewer.renderer) viewer.renderer.setClearColor(0xeceff3, 1); if (viewer.scene) viewer.scene.background = new THREE.Color(0xeceff3); } catch (e) {}
@@ -482,6 +485,12 @@ function tourUpdate() {
     if (i === 8 && !tourPicked) { tourPicked = true; doTourPicks(); }
   }
   setTourProgress(t / TOUR_TOTAL);
+  // 调试/自动验证用：记录每帧机位与注视点
+  try {
+    window.__tourState = { t: +t.toFixed(2), seg: i, pos: [cam.position.x, cam.position.y, cam.position.z].map(n => +n.toFixed(3)), look: [_pl.x, _pl.y, _pl.z].map(n => +n.toFixed(3)) };
+    if (!window.__tourLog) window.__tourLog = [];
+    if (window.__tourLog.length < 8000) window.__tourLog.push(window.__tourState);
+  } catch (e) {}
 }
 
 function startTour() {
