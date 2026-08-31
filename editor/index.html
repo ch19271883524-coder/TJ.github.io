@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3DGS 模型编辑器 · 坐标拾取</title>
+  <style>
+    :root {
+      --bg: #eef1f6;
+      --bg-grad: linear-gradient(180deg, #f7f9fc 0%, #eaeef4 100%);
+      --panel: #ffffff;
+      --panel-2: #f6f8fb;
+      --line: #e7ebf1;
+      --line-2: #d7dee8;
+      --txt: #1b2430;
+      --muted: #6b7888;
+      --accent: #2f6fed;
+      --accent-d: #1f57cf;
+      --accent-weak: rgba(47, 111, 237, .08);
+      --accent-soft: rgba(47, 111, 237, .14);
+      --ok: #15a06b;
+      --warn: #e0892a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .05);
+      --shadow: 0 2px 6px rgba(16, 24, 40, .05), 0 10px 28px rgba(16, 24, 40, .08);
+      --shadow-lg: 0 18px 50px rgba(16, 24, 40, .16);
+      --ring: 0 0 0 3px rgba(47, 111, 237, .22);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; color: var(--txt);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100%; }
+
+    /* ===== 头部 ===== */
+    header { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 18px;
+      background: linear-gradient(180deg, #ffffff, #f6f8fb);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, .6) inset, 0 1px 4px rgba(16, 24, 40, .04);
+      flex-wrap: wrap; }
+    header::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+      background: linear-gradient(90deg, #1f57cf, #2f6fed 42%, #13a085); opacity: .9; }
+    header h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .4px; display: flex; align-items: center; }
+    header .logo { display: inline-block; width: 15px; height: 15px; border-radius: 5px; margin-right: 8px;
+      background: linear-gradient(135deg, #2f6fed, #13a085); box-shadow: 0 1px 4px rgba(47, 111, 237, .42); }
+    header .sub { color: var(--muted); font-size: 12px; letter-spacing: .2px; }
+    .spacer { flex: 1; }
+
+    /* ===== 按钮 ===== */
+    .btn { background: var(--panel); color: var(--txt); border: 1px solid var(--line-2);
+      padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: .18s ease; box-shadow: var(--shadow-sm); }
+    .btn:hover { border-color: var(--accent); color: var(--accent-d); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:focus-visible { outline: none; box-shadow: var(--ring); }
+    .btn.primary { background: linear-gradient(180deg, #3a78f0, #2f6fed); color: #fff; border-color: transparent;
+      font-weight: 600; box-shadow: 0 2px 8px rgba(47, 111, 237, .35); }
+    .btn.primary:hover { background: linear-gradient(180deg, #2f6fed, #1f57cf); box-shadow: 0 4px 14px rgba(47, 111, 237, .42); color: #fff; }
+    .btn.sm { padding: 5px 11px; font-size: 12px; }
+
+    /* ===== 3D 视口 ===== */
+    #viewer { position: relative; flex: 1; min-height: 0; background: var(--bg); }
+    #drop-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: none; color: var(--muted); font-size: 14px; opacity: 0; transition: opacity .15s; text-align: center; }
+    #drop-hint.show { opacity: 1; background: var(--accent-weak); outline: 2px dashed var(--accent); outline-offset: -10px; }
+
+    /* ===== 世界坐标点 ===== */
+    #worldPins { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+    .wpin { position: absolute; transform: translate(-50%, -50%); pointer-events: none; will-change: left, top; }
+    .wpin .wdot { width: 12px; height: 12px; border-radius: 50%; background: var(--c, #2f6fed);
+      border: 2px solid #fff; box-shadow: 0 0 0 3px var(--accent-weak), 0 0 8px var(--c, #2f6fed); }
+    .wpin .wlbl { position: absolute; left: 15px; top: -6px; white-space: nowrap; background: var(--panel);
+      color: var(--txt); border: 1px solid var(--c, #2f6fed); padding: 2px 7px; border-radius: 6px; font-size: 11px;
+      font-weight: 600; box-shadow: var(--shadow); }
+
+    /* ===== 状态 / FPS / 提示 ===== */
+    #status { position: absolute; left: 14px; bottom: 14px; font-size: 12px; color: var(--txt);
+      background: rgba(255, 255, 255, .9); padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line);
+      box-shadow: var(--shadow-sm); backdrop-filter: blur(6px); z-index: 12; }
+    #fps { position: absolute; right: 14px; bottom: 14px; font-size: 12px; font-variant-numeric: tabular-nums;
+      color: var(--accent-d); font-weight: 600; background: rgba(255, 255, 255, .9); padding: 5px 12px;
+      border-radius: 999px; border: 1px solid var(--line); box-shadow: var(--shadow-sm); backdrop-filter: blur(6px); z-index: 30; }
+    #roamHelp { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: rgba(255, 255, 255, .94);
+      border: 1px solid var(--accent); color: var(--txt); padding: 7px 14px; border-radius: 999px; font-size: 12px;
+      z-index: 20; display: none; box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+    #roamHelp.show { display: block; }
+
+    /* ===== 拾取面板 ===== */
+    #pickPanel { position: absolute; right: 16px; top: 16px; width: 264px; background: rgba(255, 255, 255, .96);
+      border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
+      z-index: 20; font-size: 13px; backdrop-filter: blur(10px); }
+    #pickPanel.hidden { display: none; }
+    #pickPanel h3 { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: var(--txt); letter-spacing: .3px; }
+    #pickPanel .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 10px; }
+    .pk-list { display: flex; flex-direction: column; gap: 6px; max-height: 46vh; overflow: auto; }
+    .pk-item { display: flex; align-items: center; gap: 7px; background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 6px 9px; font-size: 12px; transition: .15s; }
+    .pk-item:hover { border-color: var(--accent); }
+    .pk-item .seq { font-weight: 700; color: var(--accent); flex: none; width: 28px; }
+    .pk-item .xyz { flex: 1; font-variant-numeric: tabular-nums; color: var(--txt); }
+    .pk-item .del { cursor: pointer; color: var(--muted); flex: none; transition: .15s; }
+    .pk-item .del:hover { color: #e5484d; }
+    .pk-acts { display: flex; gap: 6px; margin-top: 10px; }
+    .pk-acts .btn { flex: 1; padding: 5px 8px; font-size: 12px; }
+    .pk-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+
+    /* ===== 滚动条 ===== */
+    .pk-list::-webkit-scrollbar { width: 8px; }
+    .pk-list::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+    .pk-list::-webkit-scrollbar-thumb:hover { background: #c2ccd8; }
+    .pk-list::-webkit-scrollbar-track { background: transparent; }
+
+    /* ===== 移动端适配 (≤768px) ===== */
+    @media (max-width: 768px) {
+      html, body { font-size: 13px; }
+      header { padding: 9px 12px; gap: 7px; }
+      header h1 { font-size: 13.5px; }
+      header .sub { display: none; }
+      .btn { padding: 8px 13px; font-size: 13px; }
+      .btn.sm { padding: 7px 10px; }
+      #pickPanel { right: 10px; left: 10px; top: 10px; width: auto; max-width: none;
+        padding: 11px; font-size: 12px; max-height: 44vh; }
+      .pk-list { max-height: 30vh; }
+      #status, #fps { font-size: 11px; padding: 4px 9px; bottom: 10px; }
+      #status { left: 10px; }
+      #fps { right: 10px; }
+      #roamHelp { font-size: 11px; padding: 6px 11px; }
+      .wpin .wlbl { font-size: 10px; padding: 1px 5px; left: 12px; }
+    }
+    @media (max-width: 420px) {
+      header h1 { font-size: 12.5px; }
+      #pickPanel { padding: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1><span class="logo"></span>3DGS 模型编辑器</h1>
+      <span class="sub">拖入 / 选择高斯模型 · 点击表面拾取坐标</span>
+      <div class="spacer"></div>
+      <input id="file" type="file" accept=".ply,.splat,.ksplat,.spz" hidden />
+      <button class="btn" id="loadBtn">选择模型</button>
+      <button class="btn primary" id="realBtn">载入示例</button>
+      <button class="btn" id="resetBtn">回到出生点</button>
+      <label class="chk" style="display:inline-flex;align-items:center;gap:5px;color:var(--txt);font-size:12px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="pickChk" style="margin:0;accent-color:var(--accent)" /> 选取坐标
+      </label>
+    </header>
+    <div id="viewer">
+      <div id="drop-hint">松开以加载高斯泼溅模型<br/>（支持 .ply / .splat / .ksplat / .spz）</div>
+      <div id="worldPins"></div>
+      <div id="status">就绪 · 拖入模型或点击「载入示例」</div>
+      <div id="fps">– FPS</div>
+      <div id="roamHelp">第一人称模式（碰撞已开启）：WASD 移动 · Q/E 升降 · 拖拽鼠标转向</div>
+      <div id="pickPanel">
+        <h3>拾取坐标</h3>
+        <p class="hint">开启「选取坐标」后，在模型表面单击即可记录该点的 X / Y / Z 世界坐标。</p>
+        <div class="pk-list" id="pkList"><div class="pk-empty">尚未拾取任何坐标</div></div>
+        <div class="pk-acts">
+          <button class="btn" id="copyPickBtn">复制全部</button>
+          <button class="btn" id="clearPickBtn">清空</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "/TJ.github.io/heatstation/node_modules/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
