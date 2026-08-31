@@ -133,6 +133,78 @@
       header h1 { font-size: 12.5px; }
       #pickPanel { padding: 9px; }
     }
+    /* ===== 运营中心 ===== */
+    #opsCenter { position: fixed; top: 0; left: 0; bottom: 0; width: 372px; max-width: 94vw; background: var(--panel);
+      border-right: 1px solid var(--line); box-shadow: var(--shadow-lg); transform: translateX(-100%);
+      transition: transform .26s cubic-bezier(.2,.7,.2,1); z-index: 60; display: flex; flex-direction: column; }
+    #opsCenter.open { transform: translateX(0); }
+    .ops-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px;
+      border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #ffffff, #f6f8fb);
+      box-shadow: 0 1px 0 rgba(255,255,255,.6) inset; }
+    .ops-head h2 { margin: 0; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .ops-head h2::before { content: ''; width: 14px; height: 14px; border-radius: 4px;
+      background: linear-gradient(135deg, #2f6fed, #13a085); box-shadow: 0 1px 4px rgba(47,111,237,.4); }
+    .ops-close { border: none; background: transparent; font-size: 18px; color: var(--muted); cursor: pointer; line-height: 1; padding: 2px 6px; }
+    .ops-close:hover { color: var(--accent); }
+    .ops-kpi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px 14px; }
+    .kpi { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 4px; text-align: center; }
+    .kpi-v { display: block; font-size: 19px; font-weight: 800; color: var(--txt); font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .kpi-v.warn { color: var(--warn); } .kpi-v.bad { color: #e5484d; } .kpi-v.ok { color: var(--ok); }
+    .kpi-l { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .ops-tabs { display: flex; gap: 5px; padding: 0 14px 11px; border-bottom: 1px solid var(--line); }
+    .ops-tabs button { flex: 1; padding: 8px 0; font-size: 13px; font-weight: 600; border: 1px solid var(--line-2);
+      background: var(--panel); color: var(--muted); border-radius: 8px; cursor: pointer; transition: .15s; }
+    .ops-tabs button.active { background: linear-gradient(180deg, #3a78f0, #2f6fed); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(47,111,237,.3); }
+    .ops-body { flex: 1; overflow: auto; padding: 12px 14px; }
+    .tab-pane { display: none; } .tab-pane.active { display: block; }
+    .ops-tools { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+    .ops-tools input { flex: 1; min-width: 130px; padding: 7px 11px; border: 1px solid var(--line-2); border-radius: 8px; font-size: 13px; outline: none; }
+    .ops-tools input:focus { border-color: var(--accent); box-shadow: var(--ring); }
+    .chip { padding: 5px 11px; font-size: 12px; border: 1px solid var(--line-2); background: var(--panel); border-radius: 999px; cursor: pointer; color: var(--muted); transition: .15s; user-select: none; }
+    .chip.active { background: var(--accent-weak); border-color: var(--accent); color: var(--accent-d); font-weight: 600; }
+    .alarm { border: 1px solid var(--line); border-left: 3px solid var(--muted); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; background: var(--panel); }
+    .alarm.lv-urgent { border-left-color: #e5484d; } .alarm.lv-major { border-left-color: var(--warn); } .alarm.lv-minor { border-left-color: var(--accent); }
+    .alarm .a-top { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .alarm .lv { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; color: #fff; }
+    .lv-urgent .lv { background: #e5484d; } .lv-major .lv { background: var(--warn); } .lv-minor .lv { background: var(--accent); }
+    .alarm .dev { font-weight: 700; font-size: 13px; } .alarm .time { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .alarm .desc { font-size: 12px; color: var(--txt); margin: 3px 0 7px; line-height: 1.5; }
+    .alarm .a-bot { display: flex; align-items: center; gap: 8px; }
+    .alarm .st { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); }
+    .alarm .st.s-ack { color: var(--accent-d); border-color: var(--accent); background: var(--accent-weak); }
+    .alarm .st.s-ok { color: var(--ok); border-color: var(--ok); }
+    .alarm .ack { margin-left: auto; font-size: 12px; padding: 4px 12px; border: 1px solid var(--accent); background: var(--accent-weak); color: var(--accent-d); border-radius: 7px; cursor: pointer; font-weight: 600; }
+    .alarm .ack:hover { background: var(--accent-soft); }
+    .dev-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; margin-bottom: 8px; background: var(--panel); cursor: pointer; transition: .15s; }
+    .dev-card:hover { border-color: var(--accent); }
+    .dev-card .d-top { display: flex; align-items: center; gap: 7px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; } .dot.run { background: var(--ok); } .dot.stop { background: var(--muted); } .dot.fault { background: #e5484d; }
+    .dev-card .nm { font-weight: 700; font-size: 13px; } .dev-card .no { margin-left: auto; font-size: 11px; color: var(--muted); }
+    .dev-card .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .dev-card .d-detail { display: none; margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line-2); font-size: 12px; color: var(--txt); line-height: 1.8; }
+    .dev-card.open .d-detail { display: block; }
+    .dev-card .mark { margin-top: 8px; font-size: 12px; color: var(--accent-d); cursor: pointer; font-weight: 600; }
+    .dev-card .mark:hover { text-decoration: underline; }
+    .insp { border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; margin-bottom: 8px; background: var(--panel); cursor: pointer; transition: .15s; }
+    .insp:hover { border-color: var(--accent); }
+    .insp .i-top { display: flex; align-items: center; gap: 7px; }
+    .insp .nm { font-weight: 700; font-size: 13px; } .insp .st { margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+    .insp .st.on { color: var(--ok); border: 1px solid var(--ok); background: rgba(21,160,107,.08); } .insp .st.off { color: var(--muted); border: 1px solid var(--line-2); }
+    .insp .sub { font-size: 12px; color: var(--muted); margin: 4px 0 7px; }
+    .insp .prog { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+    .insp .prog > i { display: block; height: 100%; background: linear-gradient(90deg, #2f6fed, #13a085); }
+    .insp .route { display: none; margin-top: 8px; font-size: 12px; color: var(--txt); }
+    .insp.open .route { display: block; }
+    .insp .route div { padding: 3px 0; border-bottom: 1px dashed var(--line-2); }
+    .ops-empty { color: var(--muted); font-size: 12px; padding: 10px 2px; text-align: center; }
+
+    @media (max-width: 768px) {
+      #opsCenter { width: 100%; max-width: 100%; border-right: none; }
+      .ops-kpi { grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 10px 12px; }
+      .kpi-v { font-size: 17px; }
+      .ops-tabs button { padding: 7px 0; font-size: 12.5px; }
+    }
+
   </style>
 </head>
 <body>
@@ -145,6 +217,7 @@
       <button class="btn" id="loadBtn">选择模型</button>
       <button class="btn primary" id="realBtn">载入示例</button>
       <button class="btn" id="resetBtn">回到出生点</button>
+      <button class="btn primary" id="opsBtn">运营中心</button>
       <label class="chk" style="display:inline-flex;align-items:center;gap:5px;color:var(--txt);font-size:12px;cursor:pointer;user-select:none">
         <input type="checkbox" id="pickChk" style="margin:0;accent-color:var(--accent)" /> 选取坐标
       </label>
@@ -163,6 +236,50 @@
           <button class="btn" id="copyPickBtn">复制全部</button>
           <button class="btn" id="clearPickBtn">清空</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 运营中心（报警 / 设备台账 / 巡检人员） ===== -->
+  <div id="opsCenter">
+    <div class="ops-head">
+      <h2>运营中心</h2>
+      <button class="ops-close" id="opsClose" title="关闭">✕</button>
+    </div>
+    <div class="ops-kpi">
+      <div class="kpi"><span class="kpi-v" id="kDev">–</span><span class="kpi-l">设备</span></div>
+      <div class="kpi"><span class="kpi-v ok" id="kRun">–</span><span class="kpi-l">运行中</span></div>
+      <div class="kpi"><span class="kpi-v bad" id="kFault">–</span><span class="kpi-l">故障</span></div>
+      <div class="kpi"><span class="kpi-v warn" id="kAlarm">–</span><span class="kpi-l">未处理报警</span></div>
+      <div class="kpi"><span class="kpi-v" id="kInsp">–</span><span class="kpi-l">巡检完成</span></div>
+      <div class="kpi"><span class="kpi-v" id="kShift">早</span><span class="kpi-l">当前班次</span></div>
+    </div>
+    <div class="ops-tabs">
+      <button data-tab="alarm" class="active">报警</button>
+      <button data-tab="ledger">设备台账</button>
+      <button data-tab="inspect">巡检人员</button>
+    </div>
+    <div class="ops-body">
+      <div id="tab-alarm" class="tab-pane active">
+        <div class="ops-tools" id="alarmFilter">
+          <span class="chip active" data-lv="all">全部</span>
+          <span class="chip" data-lv="urgent">紧急</span>
+          <span class="chip" data-lv="major">重要</span>
+          <span class="chip" data-lv="minor">一般</span>
+        </div>
+        <div id="alarmList"></div>
+      </div>
+      <div id="tab-ledger" class="tab-pane">
+        <div class="ops-tools"><input id="ledgerSearch" placeholder="搜索设备名 / 编号 / 型号" /></div>
+        <div id="ledgerList"></div>
+      </div>
+      <div id="tab-inspect" class="tab-pane">
+        <div class="ops-tools" id="shiftFilter">
+          <span class="chip active" data-sh="早">早班</span>
+          <span class="chip" data-sh="中">中班</span>
+          <span class="chip" data-sh="晚">晚班</span>
+        </div>
+        <div id="inspList"></div>
       </div>
     </div>
   </div>
