@@ -249,38 +249,17 @@ viewerEl.addEventListener('drop', e => {
 // 编辑器模式：不自动加载任何模型，打开即空画布，由用户拖拽/选择/载入示例。
 
 // ================= 运营中心：绑定「设备面板」(DEVICES) 的报警 / 巡检 =================
-// 设备面板 DEVICES 是唯一数据源（含 3D 坐标 pos）。报警、巡检均引用面板里的设备；
-// 若设备面板为空（无面板），运营中心入口隐藏、不显示报警等运营内容。
-// 说明：以下为前端模拟数据，用于演示；后续可替换为站点真实后端接口。
-const DEVICES = [
-  { no:'HX-01', name:'板式换热器', type:'换热设备', model:'BR0.5-1.0-30-E', status:'run',   hours:6120, spec:'换热面积 30㎡·设计温度 120/60℃', loc:'换热机房 A 区', maint:'2026-08-12', owner:'张伟', pos:[-2.5,1.2,-1.0] },
-  { no:'HX-02', name:'板式换热器', type:'换热设备', model:'BR0.5-1.0-30-E', status:'run',   hours:5980, spec:'换热面积 30㎡·设计温度 120/60℃', loc:'换热机房 A 区', maint:'2026-08-12', owner:'张伟', pos:[-1.8,1.2,-1.0] },
-  { no:'P-01',  name:'循环泵',     type:'水泵',     model:'ISG80-160',      status:'run',   hours:8240, spec:'流量 50m³/h·扬程 32m·功率 7.5kW', loc:'循环泵房',   maint:'2026-07-28', owner:'李娜', pos:[1.5,0.4,1.5] },
-  { no:'P-02',  name:'循环泵',     type:'水泵',     model:'ISG80-160',      status:'stop',  hours:7010, spec:'流量 50m³/h·扬程 32m·功率 7.5kW', loc:'循环泵房',   maint:'2026-07-28', owner:'李娜', pos:[1.5,0.4,2.1] },
-  { no:'PU-01', name:'补水泵',     type:'水泵',     model:'CHL4-40',        status:'run',   hours:5330, spec:'流量 4m³/h·扬程 40m·功率 1.1kW',  loc:'补水间',     maint:'2026-08-20', owner:'王强', pos:[2.4,0.4,-0.5] },
-  { no:'PU-02', name:'补水泵',     type:'水泵',     model:'CHL4-40',        status:'fault', hours:5210, spec:'流量 4m³/h·扬程 40m·功率 1.1kW',  loc:'补水间',     maint:'2026-08-20', owner:'王强', pos:[2.4,0.4,0.1] },
-  { no:'SF-01', name:'软化水器',   type:'水处理',   model:'SN-1000',        status:'run',   hours:9100, spec:'处理量 1t/h·出水硬度 ≤0.03mmol/L', loc:'水处理间', maint:'2026-08-05', owner:'张伟', pos:[-2.8,0.6,1.2] },
-  { no:'S-01',  name:'分水器',     type:'管路附件', model:'DN150',          status:'run',   hours:9800, spec:'工作压力 1.0MPa·温度 ≤100℃',      loc:'管廊',       maint:'2026-06-30', owner:'李娜', pos:[0.2,0.3,-2.2] },
-  { no:'C-01',  name:'集水器',     type:'管路附件', model:'DN150',          status:'run',   hours:9750, spec:'工作压力 1.0MPa·温度 ≤100℃',      loc:'管廊',       maint:'2026-06-30', owner:'李娜', pos:[0.2,0.3,2.4] },
-  { no:'PLC-01',name:'控制柜',     type:'电控',     model:'XL-21',          status:'run',   hours:10200,spec:'PLC 自控·含变频柜',               loc:'控制室',     maint:'2026-08-01', owner:'王强', pos:[3.0,1.0,0.0] },
-];
-const ALARMS = [
-  { id:1, devNo:'PU-02', level:'urgent', type:'轴承温度高',     text:'温度 92℃ 超上限 85℃，疑似润滑不良',   time:'08-31 14:20', state:'open' },
-  { id:2, devNo:'PU-01', level:'urgent', type:'机械密封漏水',   text:'泵体密封处渗水，需停机检修',         time:'08-31 15:02', state:'open' },
-  { id:3, devNo:'P-01',  level:'major',  type:'出口压力低',     text:'压力 0.28MPa 低于下限 0.35MPa',       time:'08-31 13:55', state:'open' },
-  { id:4, devNo:'P-02',  level:'major',  type:'未按计划联动',   text:'备用泵未自动启动',                   time:'08-30 20:15', state:'open' },
-  { id:5, devNo:'PLC-01',level:'major',  type:'通讯中断',       text:'与上位机通讯丢失 30s，已自动重连',   time:'08-31 08:05', state:'ok' },
-  { id:6, devNo:'SF-01', level:'minor',  type:'再生盐余量低',   text:'盐箱液位偏低，请补充再生盐',         time:'08-31 09:10', state:'open' },
-  { id:7, devNo:'HX-01', level:'minor',  type:'进出口温差偏大', text:'ΔT=7.5℃ 偏大，检查二次侧流量',      time:'08-31 11:30', state:'ack' },
-  { id:8, devNo:'S-01',  level:'minor',  type:'支路温差不均',   text:'各支路温差 >5℃，平衡阀需调节',       time:'08-30 22:40', state:'ack' },
-];
-const INSPECTORS = [
-  { id:1, name:'张伟', no:'XJ-021', shift:'早', online:true,  loc:'循环泵房', done:6, route:['PLC-01','P-01','PU-01','HX-01','S-01','SF-01'] },
-  { id:2, name:'李娜', no:'XJ-034', shift:'中', online:true,  loc:'换热机房', done:4, route:['HX-02','C-01','PU-02','PLC-01','P-02','S-01'] },
-  { id:3, name:'王强', no:'XJ-009', shift:'晚', online:false, loc:'—',        done:8, route:['PLC-01','P-01','P-02','PU-01','PU-02','HX-01','HX-02','SF-01'] },
-];
+// 运营中心本身始终存在（入口常显、可打开）。
+// 设备面板 DEVICES 是唯一数据源（含 3D 坐标 pos），由「已加载的站房模型」注入；
+// 当前未加载模型 → 设备面板为空 → 报警/设备面板/巡检显示占位空态，不展示任何设备数据。
+// 说明：DEVICES/ALARMS/INSPECTORS 为后续接入真实后端时的数据结构示例（当前置空）。
+const DEVICES = [];
+const ALARMS = [];
+const INSPECTORS = [];  // 例：{ id, name, no, shift, online, loc, done, route:[devNo,...] }
+// —— 当前未加载站房模型，设备面板为空（无绑定数据），运营中心显示占位空态 ——
+// 加载模型并注入设备面板数据后，报警/巡检将自动按设备编号(devNo)绑定，并可在 3D 标注。
 
-// 设备面板查询辅助 + 「无面板则不显示运营」防护
+// 设备面板查询辅助；hasPanel 仅用于决定列表显示「空态占位」还是「真实数据」
 const hasPanel = DEVICES.length > 0;
 function devByNo(no){ return DEVICES.find(d => d.no === no); }
 function devLabel(d){ return d ? (d.name + ' ' + d.no) : ''; }
@@ -290,11 +269,9 @@ function locateDev(no){
   addPick(d.pos); setStatus('已在 3D 标注设备：' + devLabel(d));
 }
 
-// --- 运营中心开关与 tab ---
+// --- 运营中心开关与 tab（运营中心始终可打开）---
 const opsCenter = document.getElementById('opsCenter');
-if (!hasPanel) { const _ob = document.getElementById('opsBtn'); if (_ob) _ob.style.display = 'none'; }
 document.getElementById('opsBtn').onclick = () => {
-  if (!hasPanel) { setStatus('当前无设备面板，运营中心不可用'); return; }
   opsCenter.classList.add('open');
 };
 document.getElementById('opsClose').onclick = () => opsCenter.classList.remove('open');
@@ -325,7 +302,7 @@ function renderKPI() {
 let alarmLV = 'all';
 function renderAlarms() {
   const list = document.getElementById('alarmList');
-  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">无设备面板，暂无可绑定报警</div>'; return; }
+  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">尚未加载站房模型，暂无设备面板，无设备报警</div>'; return; }
   const arr = ALARMS.filter(a => alarmLV === 'all' || a.level === alarmLV);
   if (!arr.length) { list.innerHTML = '<div class="ops-empty">该等级暂无报警</div>'; return; }
   const lvMap = { urgent:['紧急','lv-urgent'], major:['重要','lv-major'], minor:['一般','lv-minor'] };
@@ -356,7 +333,7 @@ document.getElementById('alarmFilter').querySelectorAll('.chip').forEach(c => {
 // --- 设备面板（台账；可点展开，标注设备 3D）---
 function renderLedger(q = '') {
   const list = document.getElementById('ledgerList');
-  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">无设备面板</div>'; return; }
+  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">尚未加载站房模型，暂无设备面板（台账）</div>'; return; }
   const kw = q.trim().toLowerCase();
   const arr = DEVICES.filter(d => !kw || (d.name + d.no + d.model + d.type).toLowerCase().includes(kw));
   if (!arr.length) { list.innerHTML = '<div class="ops-empty">未找到匹配设备</div>'; return; }
@@ -384,7 +361,7 @@ document.getElementById('ledgerSearch').addEventListener('input', e => renderLed
 let curShift = '早';
 function renderInspect() {
   const list = document.getElementById('inspList');
-  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">无设备面板，暂无可绑定巡检</div>'; return; }
+  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">尚未加载站房模型，暂无设备面板，无巡检路线</div>'; return; }
   const arr = INSPECTORS.filter(i => i.shift === curShift);
   if (!arr.length) { list.innerHTML = '<div class="ops-empty">该班次暂无巡检人员</div>'; return; }
   list.innerHTML = arr.map(i => {
