@@ -248,8 +248,10 @@ viewerEl.addEventListener('drop', e => {
 
 // 编辑器模式：不自动加载任何模型，打开即空画布，由用户拖拽/选择/载入示例。
 
-// ================= 运营中心：报警 / 设备台账 / 巡检人员 =================
-// 说明：以下为前端模拟数据，用于演示运营面板。后续可替换为站点真实后端接口。
+// ================= 运营中心：绑定「设备面板」(DEVICES) 的报警 / 巡检 =================
+// 设备面板 DEVICES 是唯一数据源（含 3D 坐标 pos）。报警、巡检均引用面板里的设备；
+// 若设备面板为空（无面板），运营中心入口隐藏、不显示报警等运营内容。
+// 说明：以下为前端模拟数据，用于演示；后续可替换为站点真实后端接口。
 const DEVICES = [
   { no:'HX-01', name:'板式换热器', type:'换热设备', model:'BR0.5-1.0-30-E', status:'run',   hours:6120, spec:'换热面积 30㎡·设计温度 120/60℃', loc:'换热机房 A 区', maint:'2026-08-12', owner:'张伟', pos:[-2.5,1.2,-1.0] },
   { no:'HX-02', name:'板式换热器', type:'换热设备', model:'BR0.5-1.0-30-E', status:'run',   hours:5980, spec:'换热面积 30㎡·设计温度 120/60℃', loc:'换热机房 A 区', maint:'2026-08-12', owner:'张伟', pos:[-1.8,1.2,-1.0] },
@@ -263,24 +265,38 @@ const DEVICES = [
   { no:'PLC-01',name:'控制柜',     type:'电控',     model:'XL-21',          status:'run',   hours:10200,spec:'PLC 自控·含变频柜',               loc:'控制室',     maint:'2026-08-01', owner:'王强', pos:[3.0,1.0,0.0] },
 ];
 const ALARMS = [
-  { id:1, dev:'补水泵 PU-02', level:'urgent', type:'轴承温度高',     text:'温度 92℃ 超上限 85℃，疑似润滑不良',   time:'08-31 14:20', state:'open' },
-  { id:2, dev:'补水泵 PU-01', level:'urgent', type:'机械密封漏水',   text:'泵体密封处渗水，需停机检修',         time:'08-31 15:02', state:'open' },
-  { id:3, dev:'循环泵 P-01',  level:'major',  type:'出口压力低',     text:'压力 0.28MPa 低于下限 0.35MPa',       time:'08-31 13:55', state:'open' },
-  { id:4, dev:'循环泵 P-02',  level:'major',  type:'未按计划联动',   text:'备用泵未自动启动',                   time:'08-30 20:15', state:'open' },
-  { id:5, dev:'控制柜 PLC-01',level:'major',  type:'通讯中断',       text:'与上位机通讯丢失 30s，已自动重连',   time:'08-31 08:05', state:'ok' },
-  { id:6, dev:'软化水器 SF-01',level:'minor', type:'再生盐余量低',   text:'盐箱液位偏低，请补充再生盐',         time:'08-31 09:10', state:'open' },
-  { id:7, dev:'板式换热器 HX-01',level:'minor',type:'进出口温差偏大', text:'ΔT=7.5℃ 偏大，检查二次侧流量',      time:'08-31 11:30', state:'ack' },
-  { id:8, dev:'分水器 S-01',  level:'minor',  type:'支路温差不均',   text:'各支路温差 >5℃，平衡阀需调节',       time:'08-30 22:40', state:'ack' },
+  { id:1, devNo:'PU-02', level:'urgent', type:'轴承温度高',     text:'温度 92℃ 超上限 85℃，疑似润滑不良',   time:'08-31 14:20', state:'open' },
+  { id:2, devNo:'PU-01', level:'urgent', type:'机械密封漏水',   text:'泵体密封处渗水，需停机检修',         time:'08-31 15:02', state:'open' },
+  { id:3, devNo:'P-01',  level:'major',  type:'出口压力低',     text:'压力 0.28MPa 低于下限 0.35MPa',       time:'08-31 13:55', state:'open' },
+  { id:4, devNo:'P-02',  level:'major',  type:'未按计划联动',   text:'备用泵未自动启动',                   time:'08-30 20:15', state:'open' },
+  { id:5, devNo:'PLC-01',level:'major',  type:'通讯中断',       text:'与上位机通讯丢失 30s，已自动重连',   time:'08-31 08:05', state:'ok' },
+  { id:6, devNo:'SF-01', level:'minor',  type:'再生盐余量低',   text:'盐箱液位偏低，请补充再生盐',         time:'08-31 09:10', state:'open' },
+  { id:7, devNo:'HX-01', level:'minor',  type:'进出口温差偏大', text:'ΔT=7.5℃ 偏大，检查二次侧流量',      time:'08-31 11:30', state:'ack' },
+  { id:8, devNo:'S-01',  level:'minor',  type:'支路温差不均',   text:'各支路温差 >5℃，平衡阀需调节',       time:'08-30 22:40', state:'ack' },
 ];
 const INSPECTORS = [
-  { id:1, name:'张伟', no:'XJ-021', shift:'早', online:true,  loc:'循环泵房', done:6, route:['控制柜 PLC-01','循环泵 P-01','补水泵 PU-01','板式换热器 HX-01','分水器 S-01','软化水器 SF-01'] },
-  { id:2, name:'李娜', no:'XJ-034', shift:'中', online:true,  loc:'换热机房', done:4, route:['板式换热器 HX-02','集水器 C-01','补水泵 PU-02','控制柜 PLC-01','循环泵 P-02','分水器 S-01'] },
-  { id:3, name:'王强', no:'XJ-009', shift:'晚', online:false, loc:'—',        done:8, route:['控制柜 PLC-01','循环泵 P-01','循环泵 P-02','补水泵 PU-01','补水泵 PU-02','板式换热器 HX-01','板式换热器 HX-02','软化水器 SF-01'] },
+  { id:1, name:'张伟', no:'XJ-021', shift:'早', online:true,  loc:'循环泵房', done:6, route:['PLC-01','P-01','PU-01','HX-01','S-01','SF-01'] },
+  { id:2, name:'李娜', no:'XJ-034', shift:'中', online:true,  loc:'换热机房', done:4, route:['HX-02','C-01','PU-02','PLC-01','P-02','S-01'] },
+  { id:3, name:'王强', no:'XJ-009', shift:'晚', online:false, loc:'—',        done:8, route:['PLC-01','P-01','P-02','PU-01','PU-02','HX-01','HX-02','SF-01'] },
 ];
+
+// 设备面板查询辅助 + 「无面板则不显示运营」防护
+const hasPanel = DEVICES.length > 0;
+function devByNo(no){ return DEVICES.find(d => d.no === no); }
+function devLabel(d){ return d ? (d.name + ' ' + d.no) : ''; }
+function locateDev(no){
+  const d = devByNo(no); if (!d) return;
+  if (!viewer) { setStatus('请先加载模型，再标注设备「' + devLabel(d) + '」'); return; }
+  addPick(d.pos); setStatus('已在 3D 标注设备：' + devLabel(d));
+}
 
 // --- 运营中心开关与 tab ---
 const opsCenter = document.getElementById('opsCenter');
-document.getElementById('opsBtn').onclick = () => opsCenter.classList.add('open');
+if (!hasPanel) { const _ob = document.getElementById('opsBtn'); if (_ob) _ob.style.display = 'none'; }
+document.getElementById('opsBtn').onclick = () => {
+  if (!hasPanel) { setStatus('当前无设备面板，运营中心不可用'); return; }
+  opsCenter.classList.add('open');
+};
 document.getElementById('opsClose').onclick = () => opsCenter.classList.remove('open');
 document.querySelectorAll('.ops-tabs button').forEach(b => {
   b.onclick = () => {
@@ -305,26 +321,29 @@ function renderKPI() {
   document.getElementById('kInsp').textContent = totalPts ? Math.round(donePts / totalPts * 100) + '%' : '–';
 }
 
-// --- 报警 ---
+// --- 报警（绑定设备面板：设备名可点，在 3D 标注）---
 let alarmLV = 'all';
 function renderAlarms() {
   const list = document.getElementById('alarmList');
+  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">无设备面板，暂无可绑定报警</div>'; return; }
   const arr = ALARMS.filter(a => alarmLV === 'all' || a.level === alarmLV);
   if (!arr.length) { list.innerHTML = '<div class="ops-empty">该等级暂无报警</div>'; return; }
   const lvMap = { urgent:['紧急','lv-urgent'], major:['重要','lv-major'], minor:['一般','lv-minor'] };
   const stMap = { open:['未处理',''], ack:['已确认','s-ack'], ok:['已恢复','s-ok'] };
   list.innerHTML = arr.map(a => {
+    const d = devByNo(a.devNo);
     const [lvTxt, lvCls] = lvMap[a.level];
     const [stTxt, stCls] = stMap[a.state];
     return `<div class="alarm ${lvCls}">
-      <div class="a-top"><span class="lv">${lvTxt}</span><span class="dev">${a.dev}</span><span class="time">${a.time}</span></div>
+      <div class="a-top"><span class="lv">${lvTxt}</span><span class="dev" data-devno="${a.devNo}" title="点击在 3D 中标注此设备">${devLabel(d)}</span><span class="time">${a.time}</span></div>
       <div class="desc">${a.type}：${a.text}</div>
       <div class="a-bot"><span class="st ${stCls}">${stTxt}</span>${a.state === 'open' ? `<span class="ack" data-ack="${a.id}">确认</span>` : ''}</div>
     </div>`;
   }).join('');
+  list.querySelectorAll('[data-devno]').forEach(el => el.onclick = () => locateDev(el.dataset.devno));
   list.querySelectorAll('[data-ack]').forEach(b => b.onclick = () => {
     const a = ALARMS.find(x => x.id === +b.dataset.ack);
-    if (a) { a.state = 'ack'; renderAlarms(); renderKPI(); setStatus('已确认报警：' + a.dev + ' · ' + a.type); }
+    if (a) { a.state = 'ack'; renderAlarms(); renderKPI(); setStatus('已确认报警：' + devLabel(devByNo(a.devNo)) + ' · ' + a.type); }
   });
 }
 document.getElementById('alarmFilter').querySelectorAll('.chip').forEach(c => {
@@ -334,9 +353,10 @@ document.getElementById('alarmFilter').querySelectorAll('.chip').forEach(c => {
   };
 });
 
-// --- 设备台账 ---
+// --- 设备面板（台账；可点展开，标注设备 3D）---
 function renderLedger(q = '') {
   const list = document.getElementById('ledgerList');
+  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">无设备面板</div>'; return; }
   const kw = q.trim().toLowerCase();
   const arr = DEVICES.filter(d => !kw || (d.name + d.no + d.model + d.type).toLowerCase().includes(kw));
   if (!arr.length) { list.innerHTML = '<div class="ops-empty">未找到匹配设备</div>'; return; }
@@ -356,30 +376,32 @@ function renderLedger(q = '') {
   list.querySelectorAll('.dev-card').forEach(card => {
     card.onclick = (e) => { if (e.target.closest('.mark')) return; card.classList.toggle('open'); };
   });
-  list.querySelectorAll('[data-mark]').forEach(m => m.onclick = () => {
-    const d = DEVICES.find(x => x.no === m.dataset.mark);
-    if (!viewer) { setStatus('请先加载模型，再标注设备位置（载入示例或拖入文件）'); return; }
-    addPick(d.pos); setStatus('已在 3D 标注设备：' + d.name + ' ' + d.no);
-  });
+  list.querySelectorAll('[data-mark]').forEach(m => m.onclick = () => locateDev(m.dataset.mark));
 }
 document.getElementById('ledgerSearch').addEventListener('input', e => renderLedger(e.target.value));
 
-// --- 巡检人员 ---
+// --- 巡检人员（路线点绑定设备面板，可标注）---
 let curShift = '早';
 function renderInspect() {
   const list = document.getElementById('inspList');
+  if (!hasPanel) { list.innerHTML = '<div class="ops-empty">无设备面板，暂无可绑定巡检</div>'; return; }
   const arr = INSPECTORS.filter(i => i.shift === curShift);
   if (!arr.length) { list.innerHTML = '<div class="ops-empty">该班次暂无巡检人员</div>'; return; }
   list.innerHTML = arr.map(i => {
     const pct = i.route.length ? Math.round(i.done / i.route.length * 100) : 0;
+    const routeHtml = i.route.map((no, idx) => {
+      const d = devByNo(no);
+      return `<div data-devno="${no}" title="点击在 3D 标注">${idx < i.done ? '✅' : '○'} ${devLabel(d)}</div>`;
+    }).join('');
     return `<div class="insp" data-id="${i.id}">
       <div class="i-top"><span class="nm">${i.name}</span><span class="st ${i.online ? 'on' : 'off'}">${i.online ? '在岗' : '离线'}</span></div>
       <div class="sub">工号 ${i.no} · 当前位置：${i.loc} · 今日 ${i.done}/${i.route.length} 点</div>
       <div class="prog"><i style="width:${pct}%"></i></div>
-      <div class="route">${i.route.map((r, idx) => `<div>${idx < i.done ? '✅' : '○'} ${r}</div>`).join('')}</div>
+      <div class="route">${routeHtml}</div>
     </div>`;
   }).join('');
-  list.querySelectorAll('.insp').forEach(card => card.onclick = () => card.classList.toggle('open'));
+  list.querySelectorAll('.insp').forEach(card => card.onclick = (e) => { if (e.target.closest('[data-devno]')) return; card.classList.toggle('open'); });
+  list.querySelectorAll('[data-devno]').forEach(el => el.onclick = () => locateDev(el.dataset.devno));
 }
 document.getElementById('shiftFilter').querySelectorAll('.chip').forEach(c => {
   c.onclick = () => {
