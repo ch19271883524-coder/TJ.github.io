@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>3DGS 模型编辑器 · 手机版</title>
+  <style>
+    :root {
+      --bg: #eef1f6;
+      --bg-grad: linear-gradient(180deg, #f7f9fc 0%, #eaeef4 100%);
+      --panel: #ffffff;
+      --panel-2: #f6f8fb;
+      --line: #e7ebf1;
+      --line-2: #d7dee8;
+      --txt: #1b2430;
+      --muted: #6b7888;
+      --accent: #2f6fed;
+      --accent-d: #1f57cf;
+      --accent-weak: rgba(47, 111, 237, .08);
+      --accent-soft: rgba(47, 111, 237, .14);
+      --ok: #15a06b;
+      --warn: #e0892a;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .05);
+      --shadow: 0 2px 6px rgba(16, 24, 40, .05), 0 10px 28px rgba(16, 24, 40, .08);
+      --shadow-lg: 0 18px 50px rgba(16, 24, 40, .16);
+      --ring: 0 0 0 3px rgba(47, 111, 237, .22);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; color: var(--txt);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100%; }
+
+    /* ===== 顶栏（手机：仅标题 + 运营中心） ===== */
+    header { position: relative; display: flex; align-items: center; gap: 8px;
+      padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+      background: linear-gradient(180deg, #ffffff, #f6f8fb);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 4px rgba(16, 24, 40, .04); flex: none; }
+    header::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+      background: linear-gradient(90deg, #1f57cf, #2f6fed 42%, #13a085); opacity: .9; }
+    header h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .4px; display: flex; align-items: center; }
+    header .logo { display: inline-block; width: 15px; height: 15px; border-radius: 5px; margin-right: 8px;
+      background: linear-gradient(135deg, #2f6fed, #13a085); box-shadow: 0 1px 4px rgba(47, 111, 237, .42); }
+    header .sub { color: var(--muted); font-size: 11px; letter-spacing: .2px; margin-left: 2px; }
+    .spacer { flex: 1; }
+
+    /* ===== 按钮 ===== */
+    .btn { background: var(--panel); color: var(--txt); border: 1px solid var(--line-2);
+      padding: 9px 14px; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; font-weight: 600;
+      transition: .15s ease; box-shadow: var(--shadow-sm); min-height: 44px; }
+    .btn:active { transform: scale(.97); }
+    .btn:focus-visible { outline: none; box-shadow: var(--ring); }
+    .btn.primary { background: linear-gradient(180deg, #3a78f0, #2f6fed); color: #fff; border-color: transparent;
+      box-shadow: 0 2px 8px rgba(47, 111, 237, .35); }
+    .btn.sm { padding: 6px 11px; font-size: 12px; min-height: 36px; }
+
+    /* ===== 3D 视口 ===== */
+    #viewer { position: relative; flex: 1; min-height: 0; background: var(--bg); touch-action: none; }
+    #drop-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      pointer-events: none; color: var(--muted); font-size: 14px; opacity: 0; transition: opacity .15s; text-align: center; padding: 0 24px; }
+    #drop-hint.show { opacity: 1; background: var(--accent-weak); outline: 2px dashed var(--accent); outline-offset: -10px; }
+
+    /* ===== 世界坐标点 ===== */
+    #worldPins { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+    .wpin { position: absolute; transform: translate(-50%, -50%); pointer-events: none; will-change: left, top; }
+    .wpin .wdot { width: 12px; height: 12px; border-radius: 50%; background: var(--c, #2f6fed);
+      border: 2px solid #fff; box-shadow: 0 0 0 3px var(--accent-weak), 0 0 8px var(--c, #2f6fed); }
+    .wpin .wlbl { position: absolute; left: 15px; top: -6px; white-space: nowrap; background: var(--panel);
+      color: var(--txt); border: 1px solid var(--c, #2f6fed); padding: 2px 7px; border-radius: 6px; font-size: 11px;
+      font-weight: 600; box-shadow: var(--shadow); }
+
+    /* ===== 状态 / FPS（手机：移到顶部两角，避开底部操作栏） ===== */
+    #status { position: absolute; left: 10px; top: 10px; font-size: 12px; color: var(--txt);
+      background: rgba(255, 255, 255, .9); padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line);
+      box-shadow: var(--shadow-sm); backdrop-filter: blur(6px); z-index: 12; max-width: 70vw; }
+    #fps { position: absolute; right: 10px; top: 10px; font-size: 12px; font-variant-numeric: tabular-nums;
+      color: var(--accent-d); font-weight: 600; background: rgba(255, 255, 255, .9); padding: 5px 12px;
+      border-radius: 999px; border: 1px solid var(--line); box-shadow: var(--shadow-sm); backdrop-filter: blur(6px); z-index: 30; }
+    #roamHelp { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); background: rgba(255, 255, 255, .94);
+      border: 1px solid var(--accent); color: var(--txt); padding: 7px 14px; border-radius: 999px; font-size: 12px;
+      z-index: 20; display: none; box-shadow: var(--shadow); backdrop-filter: blur(6px); max-width: 92vw; text-align: center; }
+    #roamHelp.show { display: block; }
+
+    /* ===== 底部操作栏（手机：拇指可达） ===== */
+    .mbar { position: relative; flex: none; display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      background: rgba(255, 255, 255, .92); border-top: 1px solid var(--line);
+      box-shadow: 0 -2px 12px rgba(16, 24, 40, .06); backdrop-filter: blur(10px); z-index: 40; }
+    .mbar .btn { flex: 1; padding: 10px 6px; font-size: 13.5px; }
+    .mchk { display: inline-flex; align-items: center; gap: 6px; color: var(--txt); font-size: 13px; font-weight: 600;
+      border: 1px solid var(--line-2); background: var(--panel); border-radius: var(--radius-sm); padding: 0 12px;
+      min-height: 44px; cursor: pointer; user-select: none; flex: 1; justify-content: center; }
+    .mchk input { margin: 0; accent-color: var(--accent); width: 17px; height: 17px; }
+    .mchk:has(input:checked) { border-color: var(--accent); background: var(--accent-weak); color: var(--accent-d); }
+
+    /* ===== 拾取面板（手机：底部上滑抽屉，位于操作栏之上） ===== */
+    #pickPanel { position: fixed; left: 10px; right: 10px;
+      bottom: calc(72px + env(safe-area-inset-bottom)); width: auto; max-width: none;
+      background: rgba(255, 255, 255, .97); border: 1px solid var(--line); border-radius: 14px;
+      padding: 13px; box-shadow: var(--shadow); z-index: 45; font-size: 13px; backdrop-filter: blur(10px);
+      max-height: 42vh; overflow: auto; }
+    #pickPanel.hidden { display: none; }
+    #pickPanel h3 { margin: 0 0 9px; font-size: 14px; font-weight: 700; color: var(--txt); letter-spacing: .3px; }
+    #pickPanel .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 9px; }
+    .pk-list { display: flex; flex-direction: column; gap: 6px; max-height: 28vh; overflow: auto; }
+    .pk-item { display: flex; align-items: center; gap: 7px; background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; }
+    .pk-item .seq { font-weight: 700; color: var(--accent); flex: none; width: 28px; }
+    .pk-item .xyz { flex: 1; font-variant-numeric: tabular-nums; color: var(--txt); }
+    .pk-item .del { cursor: pointer; color: var(--muted); flex: none; padding: 4px 6px; }
+    .pk-item .del:hover { color: #e5484d; }
+    .pk-acts { display: flex; gap: 6px; margin-top: 9px; }
+    .pk-acts .btn { flex: 1; padding: 8px; font-size: 12.5px; min-height: 40px; }
+    .pk-empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+
+    /* ===== 滚动条 ===== */
+    .pk-list::-webkit-scrollbar { width: 8px; }
+    .pk-list::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 4px; }
+
+    /* ===== 运营中心（手机：底部抽屉，圆角上沿 + 拖拽条） ===== */
+    #opsCenter { position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+      height: 86vh; max-height: 86vh; width: 100%; max-width: 100%;
+      background: var(--panel); border-radius: 18px 18px 0 0;
+      box-shadow: 0 -12px 40px rgba(16, 24, 40, .22); transform: translateY(100%);
+      transition: transform .28s cubic-bezier(.2, .7, .2, 1); z-index: 60;
+      display: flex; flex-direction: column; }
+    #opsCenter.open { transform: translateY(0); }
+    #opsCenter::before { content: ''; position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      width: 40px; height: 4px; border-radius: 2px; background: var(--line-2); z-index: 2; }
+    .ops-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px 12px;
+      border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #ffffff, #f6f8fb); }
+    .ops-head h2 { margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .ops-head h2::before { content: ''; width: 14px; height: 14px; border-radius: 4px;
+      background: linear-gradient(135deg, #2f6fed, #13a085); box-shadow: 0 1px 4px rgba(47, 111, 237, .4); }
+    .ops-close { border: none; background: transparent; font-size: 20px; color: var(--muted); cursor: pointer; line-height: 1; padding: 4px 8px; }
+    .ops-close:active { color: var(--accent); }
+    .ops-kpi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; }
+    .kpi { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 4px; text-align: center; }
+    .kpi-v { display: block; font-size: 20px; font-weight: 800; color: var(--txt); font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .kpi-v.warn { color: var(--warn); } .kpi-v.bad { color: #e5484d; } .kpi-v.ok { color: var(--ok); }
+    .kpi-l { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .ops-tabs { display: flex; gap: 6px; padding: 0 14px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); z-index: 1; }
+    .ops-tabs button { flex: 1; padding: 11px 0; font-size: 14px; font-weight: 600; border: 1px solid var(--line-2);
+      background: var(--panel); color: var(--muted); border-radius: 9px; cursor: pointer; transition: .15s; min-height: 44px; }
+    .ops-tabs button.active { background: linear-gradient(180deg, #3a78f0, #2f6fed); color: #fff; border-color: transparent; box-shadow: 0 2px 8px rgba(47, 111, 237, .3); }
+    .ops-body { flex: 1; overflow: auto; padding: 14px; -webkit-overflow-scrolling: touch; }
+    .tab-pane { display: none; } .tab-pane.active { display: block; }
+    .ops-tools { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+    .ops-tools input { flex: 1; min-width: 130px; padding: 11px; border: 1px solid var(--line-2); border-radius: 9px; font-size: 14px; outline: none; min-height: 44px; }
+    .ops-tools input:focus { border-color: var(--accent); box-shadow: var(--ring); }
+    .chip { padding: 9px 14px; font-size: 13px; border: 1px solid var(--line-2); background: var(--panel); border-radius: 999px; cursor: pointer; color: var(--muted); transition: .15s; user-select: none; min-height: 40px; display: inline-flex; align-items: center; }
+    .chip.active { background: var(--accent-weak); border-color: var(--accent); color: var(--accent-d); font-weight: 600; }
+    .alarm { border: 1px solid var(--line); border-left: 3px solid var(--muted); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; background: var(--panel); }
+    .alarm.lv-urgent { border-left-color: #e5484d; } .alarm.lv-major { border-left-color: var(--warn); } .alarm.lv-minor { border-left-color: var(--accent); }
+    .alarm .a-top { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+    .alarm .lv { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; color: #fff; }
+    .lv-urgent .lv { background: #e5484d; } .lv-major .lv { background: var(--warn); } .lv-minor .lv { background: var(--accent); }
+    .alarm .dev { font-weight: 700; font-size: 13px; } .alarm .time { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .alarm .desc { font-size: 12.5px; color: var(--txt); margin: 4px 0 8px; line-height: 1.5; }
+    .alarm .a-bot { display: flex; align-items: center; gap: 8px; }
+    .alarm .st { font-size: 11px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); }
+    .alarm .st.s-ack { color: var(--accent-d); border-color: var(--accent); background: var(--accent-weak); }
+    .alarm .st.s-ok { color: var(--ok); border-color: var(--ok); }
+    .alarm .ack { margin-left: auto; font-size: 13px; padding: 9px 16px; border: 1px solid var(--accent); background: var(--accent-weak); color: var(--accent-d); border-radius: 8px; cursor: pointer; font-weight: 600; min-height: 40px; }
+    .alarm .ack:active { background: var(--accent-soft); }
+    .dev-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 9px; background: var(--panel); cursor: pointer; transition: .15s; }
+    .dev-card:active { border-color: var(--accent); }
+    .dev-card .d-top { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; } .dot.run { background: var(--ok); } .dot.stop { background: var(--muted); } .dot.fault { background: #e5484d; }
+    .dev-card .nm { font-weight: 700; font-size: 14px; } .dev-card .no { margin-left: auto; font-size: 11px; color: var(--muted); }
+    .dev-card .meta { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+    .dev-card .d-detail { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-2); font-size: 12.5px; color: var(--txt); line-height: 1.8; }
+    .dev-card.open .d-detail { display: block; }
+    .dev-card .mark { margin-top: 9px; font-size: 13px; color: var(--accent-d); cursor: pointer; font-weight: 600; padding: 8px 0; }
+    .dev-card .mark:active { text-decoration: underline; }
+    .insp { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 9px; background: var(--panel); cursor: pointer; transition: .15s; }
+    .insp:active { border-color: var(--accent); }
+    .insp .i-top { display: flex; align-items: center; gap: 8px; }
+    .insp .nm { font-weight: 700; font-size: 14px; } .insp .st { margin-left: auto; font-size: 11px; padding: 3px 9px; border-radius: 999px; }
+    .insp .st.on { color: var(--ok); border: 1px solid var(--ok); background: rgba(21, 160, 107, .08); } .insp .st.off { color: var(--muted); border: 1px solid var(--line-2); }
+    .insp .sub { font-size: 12.5px; color: var(--muted); margin: 5px 0 8px; }
+    .insp .prog { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+    .insp .prog > i { display: block; height: 100%; background: linear-gradient(90deg, #2f6fed, #13a085); }
+    .insp .route { display: none; margin-top: 9px; font-size: 12.5px; color: var(--txt); }
+    .insp.open .route { display: block; }
+    .insp .route div { padding: 5px 0; border-bottom: 1px dashed var(--line-2); }
+    .ops-empty { color: var(--muted); font-size: 13px; padding: 18px 4px; text-align: center; line-height: 1.7; }
+
+    @media (min-width: 560px) {
+      #app { max-width: 480px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1><span class="logo"></span>3DGS 编辑器</h1>
+      <span class="sub">手机版</span>
+      <div class="spacer"></div>
+      <button class="btn primary" id="opsBtn">运营中心</button>
+    </header>
+    <div id="viewer">
+      <div id="drop-hint">松开以加载高斯泼溅模型<br/>（支持 .ply / .splat / .ksplat / .spz）</div>
+      <div id="worldPins"></div>
+      <div id="status">就绪 · 点「载入示例」或「选择模型」</div>
+      <div id="fps">– FPS</div>
+      <div id="roamHelp">第一人称模式（碰撞已开启）：WASD 移动 · Q/E 升降 · 拖拽鼠标转向</div>
+      <div id="pickPanel">
+        <h3>拾取坐标</h3>
+        <p class="hint">开启「选取坐标」后，在模型表面单击即可记录该点的 X / Y / Z 世界坐标。</p>
+        <div class="pk-list" id="pkList"><div class="pk-empty">尚未拾取任何坐标</div></div>
+        <div class="pk-acts">
+          <button class="btn" id="copyPickBtn">复制全部</button>
+          <button class="btn" id="clearPickBtn">清空</button>
+        </div>
+      </div>
+    </div>
+    <nav class="mbar">
+      <input id="file" type="file" accept=".ply,.splat,.ksplat,.spz" hidden />
+      <button class="btn primary" id="realBtn">载入示例</button>
+      <button class="btn" id="loadBtn">选择模型</button>
+      <label class="mchk"><input type="checkbox" id="pickChk" /> 选取坐标</label>
+      <button class="btn" id="resetBtn">回出生点</button>
+    </nav>
+  </div>
+
+  <!-- ===== 运营中心（报警 / 设备面板 / 巡检人员） ===== -->
+  <div id="opsCenter">
+    <div class="ops-head">
+      <h2>运营中心</h2>
+      <button class="ops-close" id="opsClose" title="关闭">✕</button>
+    </div>
+    <div class="ops-kpi">
+      <div class="kpi"><span class="kpi-v" id="kDev">–</span><span class="kpi-l">设备</span></div>
+      <div class="kpi"><span class="kpi-v ok" id="kRun">–</span><span class="kpi-l">运行中</span></div>
+      <div class="kpi"><span class="kpi-v bad" id="kFault">–</span><span class="kpi-l">故障</span></div>
+      <div class="kpi"><span class="kpi-v warn" id="kAlarm">–</span><span class="kpi-l">未处理报警</span></div>
+      <div class="kpi"><span class="kpi-v" id="kInsp">–</span><span class="kpi-l">巡检完成</span></div>
+      <div class="kpi"><span class="kpi-v" id="kShift">早</span><span class="kpi-l">当前班次</span></div>
+    </div>
+    <div class="ops-tabs">
+      <button data-tab="alarm" class="active">报警</button>
+      <button data-tab="ledger">设备面板</button>
+      <button data-tab="inspect">巡检人员</button>
+    </div>
+    <div class="ops-body">
+      <div id="tab-alarm" class="tab-pane active">
+        <div class="ops-tools" id="alarmFilter">
+          <span class="chip active" data-lv="all">全部</span>
+          <span class="chip" data-lv="urgent">紧急</span>
+          <span class="chip" data-lv="major">重要</span>
+          <span class="chip" data-lv="minor">一般</span>
+        </div>
+        <div id="alarmList"></div>
+      </div>
+      <div id="tab-ledger" class="tab-pane">
+        <div class="ops-tools"><input id="ledgerSearch" placeholder="搜索设备名 / 编号 / 型号" /></div>
+        <div id="ledgerList"></div>
+      </div>
+      <div id="tab-inspect" class="tab-pane">
+        <div class="ops-tools" id="shiftFilter">
+          <span class="chip active" data-sh="早">早班</span>
+          <span class="chip" data-sh="中">中班</span>
+          <span class="chip" data-sh="晚">晚班</span>
+        </div>
+        <div id="inspList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "/TJ.github.io/heatstation/node_modules/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="../editor/app.js"></script>
+</body>
+</html>
